@@ -95,9 +95,9 @@ func _build_slot_stylebox() -> StyleBoxFlat:
 ## instead of showing `res://icon.svg`.
 func _build_empty_well_stylebox() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.0, 0.0, 0.25098)
-	style.border_color = Color(0.301961, 0.278431, 0.352941, 0.6)
-	style.set_border_width_all(1)
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.35)
+	style.border_color = Color(0.301961, 0.278431, 0.352941, 0.8)
+	style.set_border_width_all(2)
 	style.set_corner_radius_all(4)
 	return style
 
@@ -107,6 +107,7 @@ func _build_children() -> void:
 	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hbox.add_theme_constant_override("separation", int(SLOT_GAP))
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(hbox)
 
 	# Fixed-size icon box, vertically centred so it never stretches with the row.
@@ -135,15 +136,20 @@ func _build_children() -> void:
 
 	var text_box: VBoxContainer = VBoxContainer.new()
 	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	text_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	text_box.add_theme_constant_override("separation", 2)
 	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hbox.add_child(text_box)
 
 	var slot_label_node: Label = Label.new()
 	slot_label_node.text = slot_label
+	slot_label_node.modulate = Color(0.7, 0.7, 0.7, 1.0) # Dimmed slot label
+	slot_label_node.add_theme_font_size_override("font_size", 14)
 	slot_label_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text_box.add_child(slot_label_node)
 
 	_name_label = Label.new()
 	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_name_label.add_theme_font_size_override("font_size", 16)
 	text_box.add_child(_name_label)
