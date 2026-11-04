@@ -103,12 +103,22 @@ func _build_empty_well_stylebox() -> StyleBoxFlat:
 
 
 func _build_children() -> void:
+	# Use a MarginContainer to ensure content stays inside the panel borders.
+	var margin_container: MarginContainer = MarginContainer.new()
+	margin_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin_container.add_theme_constant_override("margin_left", int(SLOT_CONTENT_MARGIN))
+	margin_container.add_theme_constant_override("margin_top", int(SLOT_CONTENT_MARGIN))
+	margin_container.add_theme_constant_override("margin_right", int(SLOT_CONTENT_MARGIN))
+	margin_container.add_theme_constant_override("margin_bottom", int(SLOT_CONTENT_MARGIN))
+	margin_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(margin_container)
+
 	var hbox: HBoxContainer = HBoxContainer.new()
-	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hbox.add_theme_constant_override("separation", int(SLOT_GAP))
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(hbox)
+	margin_container.add_child(hbox)
 
 	# Fixed-size icon box, vertically centred so it never stretches with the row.
 	var icon_holder: Control = Control.new()
