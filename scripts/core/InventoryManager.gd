@@ -14,6 +14,11 @@ func _ready() -> void:
 	_slots.resize(MAX_CAPACITY)
 
 
+## Read-only view of the current slots; an empty slot is `null`.
+func get_slots() -> Array[ItemData]:
+	return _slots.duplicate()
+
+
 ## Places `item` in the first empty slot and returns whether it succeeded.
 ## Returns `false` for a null item or when the inventory is full.
 func add_item(item: ItemData) -> bool:
