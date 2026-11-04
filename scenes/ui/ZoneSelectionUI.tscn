@@ -1,0 +1,95 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/ZoneSelectionUI.gd" id="1_zone"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_zone"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.0901961, 0.0901961, 0.121569, 0.941176)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.301961, 0.278431, 0.352941, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="ZoneSelectionUI" type="PanelContainer"]
+anchors_preset = 0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 424.0
+offset_bottom = 424.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_zone")
+script = ExtResource("1_zone")
+
+[node name="Layout" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Selector" type="VBoxContainer" parent="Layout"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Layout/Selector"]
+layout_mode = 2
+text = "Zones"
+horizontal_alignment = 1
+
+[node name="Scroll" type="ScrollContainer" parent="Layout/Selector"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ZoneList" type="VBoxContainer" parent="Layout/Selector/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Details" type="VBoxContainer" parent="Layout"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="ZoneHeader" type="VBoxContainer" parent="Layout/Details"]
+layout_mode = 2
+
+[node name="ZoneNameLabel" type="Label" parent="Layout/Details/ZoneHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Active Zone"
+
+[node name="BackgroundRect" type="TextureRect" parent="Layout/Details"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CombatProgress" type="VBoxContainer" parent="Layout/Details"]
+layout_mode = 2
+
+[node name="EnemyNameLabel" type="Label" parent="Layout/Details/CombatProgress"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Searching..."
+
+[node name="EnemyHealthBar" type="ProgressBar" parent="Layout/Details/CombatProgress"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+show_percentage = false
+
+[node name="Rewards" type="VBoxContainer" parent="Layout/Details"]
+layout_mode = 2
+size_flags_vertical = 10
+
+[node name="PendingRewardsLabel" type="Label" parent="Layout/Details/Rewards"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Session Gold: 0"

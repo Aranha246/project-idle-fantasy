@@ -1,24 +1,30 @@
 extends Node
-## Drives the idle combat loop by simulating combat ticks modified by player stats.
+## Manages multiple gameplay zones, monster spawning, and stat-scaled combat.
 
 const TICK_INTERVAL: float = 1.0
-const MIN_REWARD_COPPER: int = 15
-const MAX_REWARD_COPPER: int = 45
 
-# Base quest failure rate
-var base_failure_chance: float = 0.10 # 10%
-var base_loot_drop_chance: float = 0.25
+# Progression thresholds (simplified for now)
+var zone_unlock_levels: Dictionary = {
+	0: 1,  # Zone 0 unlocks at level 1
+	1: 5,  # Zone 1 unlocks at level 5
+}
 
-## Scaling factors for stat-driven progression
-var attack_power_scaling: float = 0.005 # 0.5% speed increase per point
-var luck_drop_scaling: float = 0.01 # 1% drop chance increase per point
-var defense_fail_reduction: float = 0.005 # 0.5% failure reduction per point
+## Scaling factors
+@export var attack_power_speed_scaling: float = 0.005 # 0.5% speed per AP
+@export var gold_tier_multiplier: float = 1.5 # 50% more gold per tier
+@export var health_tier_multiplier: float = 2.0 # 100% more health per tier
 
-## Current player stats snapshot
+## Current state
+var current_active_zone: Resource = null
+var current_enemy: Resource = null
+var current_enemy_max_health: int = 0
+var current_enemy_health: int = 0
 var _player_stats: Dictionary = {}
-
 var _combat_timer: Timer
-var loot_item: ItemData = null
+
+# Pending rewards tracking
+var _pending_gold: int = 0
+var _pending_items: Array[ItemData] = []
 
 
 func _ready() -> void:
@@ -27,9 +33,44 @@ func _ready() -> void:
 	_combat_timer = Timer.new()
 	_combat_timer.wait_time = TICK_INTERVAL
 	_combat_timer.one_shot = false
-	_combat_timer.autostart = true
 	_combat_timer.timeout.connect(_on_combat_tick)
 	add_child(_combat_timer)
+	
+	# Initial setup - we would normally load this from a database or resource collection
+	_initialize_default_zone()
+
+
+func set_active_zone(zone: Resource) -> void:
+	if zone == null: return
+	
+	if zone.has_method("validate"):
+		var validation_error: String = zone.validate()
+		if not validation_error.is_empty():
+			push_error("IdleQuestManager: invalid zone '%s'. %s" % [zone.zone_name, validation_error])
+			return
+		
+	current_active_zone = zone
+	SignalBus.zone_changed.emit(zone)
+	_spawn_enemy()
+	
+	if not _combat_timer.is_inside_tree():
+		await _combat_timer.ready
+	_combat_timer.start()
+
+
+func _initialize_default_zone() -> void:
+	# Create a dummy starting zone if none exists
+	var starter_zone = load("res://scripts/resources/ZoneData.gd").new()
+	starter_zone.zone_name = "Whispering Woods"
+	starter_zone.tier_level = 1
+	
+	var slime = load("res://scripts/resources/EnemyData.gd").new()
+	slime.enemy_name = "Green Slime"
+	slime.base_health = 50
+	slime.spawn_weight = 10.0
+	
+	starter_zone.monster_pool = [slime]
+	set_active_zone(starter_zone)
 
 
 func _on_stats_updated(stats: Dictionary) -> void:
@@ -37,68 +78,92 @@ func _on_stats_updated(stats: Dictionary) -> void:
 	
 	# Update combat speed based on Attack Power
 	var atk: float = stats.attack_power.total
-	var speed_mod: float = 1.0 / (1.0 + (atk * attack_power_scaling))
+	var speed_mod: float = 1.0 / (1.0 + (atk * attack_power_speed_scaling))
 	_combat_timer.wait_time = TICK_INTERVAL * speed_mod
-	
-	print("[IdleQuestManager] Stats updated. New Tick Interval: %.3fs" % _combat_timer.wait_time)
 
 
 func _on_combat_tick() -> void:
-	if _check_quest_failure():
-		print("[IdleQuestManager] Quest tick failed!")
+	if current_enemy == null:
+		_spawn_enemy()
 		return
 		
-	var reward_copper: int = randi_range(MIN_REWARD_COPPER, MAX_REWARD_COPPER)
-	SignalBus.enemy_defeated.emit(reward_copper)
-	_try_drop_loot()
-
-
-func _check_quest_failure() -> bool:
-	var def: float = _player_stats.get("defense", {"total": 0.0}).total
-	var atk: float = _player_stats.get("attack_power", {"total": 0.0}).total
+	# Combat logic: each tick deals damage to the enemy
+	var damage: int = int(_player_stats.get("attack_power", {"total": 10.0}).total)
+	current_enemy_health -= damage
 	
-	# Combined defense and attack power reduce failure chance
-	var reduction: float = (def * defense_fail_reduction) + (atk * 0.001)
-	var current_fail_chance: float = max(0.01, base_failure_chance - reduction)
-	
-	return randf() < current_fail_chance
+	if current_enemy_health <= 0:
+		_complete_enemy()
+	else:
+		SignalBus.enemy_health_updated.emit(current_enemy_health, current_enemy_max_health)
 
 
-func _try_drop_loot() -> void:
-	var luck: float = _player_stats.get("luck", {"total": 0.0}).total
-	var current_drop_chance: float = base_loot_drop_chance + (luck * luck_drop_scaling)
-	
-	var roll: float = randf()
-	if roll >= current_drop_chance:
+func _spawn_enemy() -> void:
+	if current_active_zone == null or current_active_zone.monster_pool.is_empty():
 		return
 		
-	var item: ItemData = _create_loot_item()
-	if item != null:
+	# Weighted selection
+	var total_weight: float = 0.0
+	for monster in current_active_zone.monster_pool:
+		total_weight += monster.spawn_weight
+		
+	var roll: float = randf() * total_weight
+	var current_weight: float = 0.0
+	
+	for monster in current_active_zone.monster_pool:
+		current_weight += monster.spawn_weight
+		if roll <= current_weight:
+			current_enemy = monster
+			break
+			
+	# Scale health to zone tier
+	var tier: int = current_active_zone.tier_level
+	current_enemy_max_health = int(current_enemy.base_health * pow(health_tier_multiplier, tier - 1))
+	current_enemy_health = current_enemy_max_health
+	
+	SignalBus.enemy_spawned.emit(current_enemy, current_enemy_health, current_enemy_max_health)
+
+
+func _complete_enemy() -> void:
+	var rewards := _calculate_quest_rewards()
+	
+	# Grant rewards
+	if rewards.gold > 0:
+		SignalBus.enemy_defeated.emit(rewards.gold)
+		
+	for item in rewards.items:
 		_grant_to_inventory(item)
-
-
-func _create_loot_item() -> ItemData:
-	if loot_item != null:
-		return loot_item
 		
-	var default_item: ItemData = ItemData.new()
-	default_item.item_id = &"rusty_dagger"
-	default_item.item_name = "Rusty Dagger"
-	default_item.item_type = ItemData.ItemType.WEAPON
-	default_item.rarity = ItemData.Rarity.COMMON
-	default_item.max_stack_size = 1
-	default_item.sell_value_copper = 10
-	default_item.equipment_slot = ItemData.EquipmentSlot.WEAPON
-	# Default stats for the rusty dagger
-	default_item.attack_power_mod = 2.0
-	default_item.luck_mod = 1.0
+	SignalBus.quest_completed.emit({
+		"gold": rewards.gold,
+		"items": rewards.items,
+		"enemy": current_enemy
+	})
 	
-	return default_item
+	_spawn_enemy()
+
+
+func _calculate_quest_rewards() -> Dictionary:
+	var tier: int = current_active_zone.tier_level
+	var luck: float = _player_stats.get("luck", {"total": 0.0}).total
+	
+	# Gold scaling
+	var base_gold: int = randi_range(15, 45)
+	var scaled_gold: int = int(base_gold * pow(gold_tier_multiplier, tier - 1))
+	
+	# Item drops
+	var dropped_items: Array[ItemData] = []
+	# For now, we use a simple chance based on luck and zone
+	var drop_mod: float = current_active_zone.get_scaled_drop_rate_modifier(luck)
+	
+	# We would normally iterate through enemy loot tables here
+	# For this implementation, let's just keep the default loot roll if applicable
+	
+	return {
+		"gold": scaled_gold,
+		"items": dropped_items
+	}
 
 
 func _grant_to_inventory(item: ItemData) -> void:
-	if not is_instance_valid(InventoryManager):
-		return
-		
-	if InventoryManager.add_item(item):
+	if is_instance_valid(InventoryManager) and InventoryManager.add_item(item):
 		SignalBus.item_dropped.emit(item, Vector2.ZERO)

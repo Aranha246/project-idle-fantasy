@@ -37,3 +37,15 @@ signal equipment_updated(slot_name: String, item_data: ItemData)
 ## `stats` is a Dictionary containing: "attack_power", "defense", "critical_rate", "luck"
 ## Each entry is a Sub-Dictionary: {"base": float, "total": float, "bonus": float}
 signal stats_updated(stats: Dictionary)
+
+## Emitted when the active zone changes.
+signal zone_changed(new_zone: Resource)
+
+## Emitted when a new enemy is spawned.
+signal enemy_spawned(enemy_data: Resource, current_health: int, max_health: int)
+
+## Emitted when an enemy's health changes.
+signal enemy_health_updated(current_health: int, max_health: int)
+
+## Emitted when a quest (combat tick) is completed with rewards.
+signal quest_completed(rewards: Dictionary)

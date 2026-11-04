@@ -12,6 +12,7 @@ const UI_SCENES: Array[String] = [
 	"res://scenes/ui/InventoryUI.tscn",
 	"res://scenes/ui/EquipmentUI.tscn",
 	"res://scenes/ui/StatsUI.tscn",
+	"res://scenes/ui/ZoneSelectionUI.tscn",
 ]
 
 ## CanvasLayer level used to host UI scenes that are not one already.
