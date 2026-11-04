@@ -10,6 +10,7 @@ extends Node2D
 const UI_SCENES: Array[String] = [
 	"res://scenes/ui/HUD.tscn",
 	"res://scenes/ui/InventoryUI.tscn",
+	"res://scenes/ui/EquipmentUI.tscn",
 ]
 
 ## CanvasLayer level used to host UI scenes that are not one already.

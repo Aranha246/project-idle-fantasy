@@ -30,3 +30,23 @@ func add_item(item: ItemData) -> bool:
 	_slots[empty_index] = item
 	SignalBus.inventory_updated.emit()
 	return true
+
+
+## Returns whether `item` is currently stored in any slot.
+func has_item(item: ItemData) -> bool:
+	if item == null:
+		return false
+	return _slots.has(item)
+
+
+## Removes `item` from the inventory and returns whether it was found.
+## The matching slot is cleared and `SignalBus.inventory_updated` is emitted.
+func remove_item(item: ItemData) -> bool:
+	if item == null:
+		return false
+	var index: int = _slots.find(item)
+	if index == -1:
+		return false
+	_slots[index] = null
+	SignalBus.inventory_updated.emit()
+	return true

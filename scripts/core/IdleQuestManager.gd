@@ -70,6 +70,7 @@ func _create_loot_item() -> ItemData:
 	default_item.rarity = ItemData.Rarity.COMMON
 	default_item.max_stack_size = 1
 	default_item.sell_value_copper = 10
+	default_item.equipment_slot = ItemData.EquipmentSlot.WEAPON
 	return default_item
 
 

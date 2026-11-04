@@ -18,3 +18,8 @@ signal inventory_updated()
 ## Emitted when a defeated enemy drops an item, with the drop position used
 ## for in-game feedback.
 signal item_dropped(item_data: ItemData, drop_position: Vector2)
+
+## Emitted whenever a piece of equipment changes. `slot_name` identifies the
+## modified equipment slot and `item_data` is the newly equipped item, or `null`
+## when the slot was cleared (unequipped).
+signal equipment_updated(slot_name: String, item_data: ItemData)

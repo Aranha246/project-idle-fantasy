@@ -21,6 +21,7 @@ SignalBus="*res://scripts/core/SignalBus.gd"
 CurrencyManager="*res://scripts/core/CurrencyManager.gd"
 IdleQuestManager="*res://scripts/core/IdleQuestManager.gd"
 InventoryManager="*res://scripts/core/InventoryManager.gd"
+EquipmentManager="*res://scripts/core/EquipmentManager.gd"
 
 [display]
 
