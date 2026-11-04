@@ -12,7 +12,18 @@ enum ItemType {
 	MATERIAL,
 }
 
+enum Rarity {
+	COMMON,
+	UNCOMMON,
+	RARE,
+	EPIC,
+	LEGENDARY,
+}
+
+@export var item_id: StringName = &""
 @export var item_name: String = ""
 @export var item_icon: Texture2D
 @export var item_type: ItemType = ItemType.MATERIAL
+@export var rarity: Rarity = Rarity.COMMON
+@export var max_stack_size: int = 1
 @export var sell_value_copper: int = 0

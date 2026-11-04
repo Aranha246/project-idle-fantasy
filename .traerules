@@ -13,3 +13,6 @@
 [Language & Response Formatting]
 - Always respond exclusively in English. 
 - Do not mix Portuguese and English under any circumstances, including summary notes, git commit suggestions, or explanations.
+
+[Git Automation Workflow]
+- Whenever a task, feature implementation, or bugfix is successfully completed and validated, you must automatically execute the git workflow in the terminal: stage all changes (`git add .`), commit with a clear and descriptive message (`git commit -m "..."`), and push to the remote branch (`git push`) without waiting for the user to prompt you.
