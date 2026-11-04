@@ -9,7 +9,8 @@ extends ItemSlotUI
 const SLOT_MIN_SIZE: Vector2 = Vector2(232.0, 56.0)
 const SLOT_ICON_SIZE: float = 40.0
 const SLOT_CONTENT_MARGIN: float = 8.0
-const EMPTY_BACKGROUND_MODULATE: Color = Color(1.0, 1.0, 1.0, 0.25)
+## Horizontal gap between the icon box and the label column.
+const SLOT_GAP: float = 12.0
 
 ## Canonical slot name (e.g. "WEAPON") understood by `EquipmentManager`.
 var slot_name: String = ""
@@ -18,7 +19,7 @@ var slot_name: String = ""
 var slot_label: String = ""
 
 var _item_icon: TextureRect
-var _empty_background: TextureRect
+var _empty_background: Panel
 var _name_label: Label
 
 
@@ -89,28 +90,42 @@ func _build_slot_stylebox() -> StyleBoxFlat:
 	return style
 
 
+## Backdrop drawn behind the icon box while the slot is empty. It is a plain
+## inset well (never the item fallback icon) so an empty slot stays clean
+## instead of showing `res://icon.svg`.
+func _build_empty_well_stylebox() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.25098)
+	style.border_color = Color(0.301961, 0.278431, 0.352941, 0.6)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	return style
+
+
 func _build_children() -> void:
 	var hbox: HBoxContainer = HBoxContainer.new()
 	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hbox.add_theme_constant_override("separation", 10)
+	hbox.add_theme_constant_override("separation", int(SLOT_GAP))
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hbox)
 
-	# Icon area: an empty background texture behind the equipped item's icon.
+	# Fixed-size icon box, vertically centred so it never stretches with the row.
 	var icon_holder: Control = Control.new()
 	icon_holder.custom_minimum_size = Vector2(SLOT_ICON_SIZE, SLOT_ICON_SIZE)
+	icon_holder.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	icon_holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hbox.add_child(icon_holder)
 
-	_empty_background = TextureRect.new()
-	_empty_background.texture = DEFAULT_ITEM_ICON
+	# Empty well: a neutral inset backdrop, deliberately NOT the item fallback
+	# icon, so an empty slot shows nothing but a subtle frame.
+	_empty_background = Panel.new()
 	_empty_background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_empty_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_empty_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_empty_background.modulate = EMPTY_BACKGROUND_MODULATE
+	_empty_background.add_theme_stylebox_override("panel", _build_empty_well_stylebox())
 	_empty_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon_holder.add_child(_empty_background)
 
+	# Item icon: fixed 40x40 box, aspect-preserving, hidden while empty.
 	_item_icon = TextureRect.new()
 	_item_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_item_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
