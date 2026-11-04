@@ -15,6 +15,7 @@ const DEFAULT_ITEM_ICON: Texture2D = preload("res://icon.svg")
 @onready var _grid: GridContainer = %InventoryGrid
 
 var _slot_icons: Array[TextureRect] = []
+var _slot_panels: Array[Panel] = []
 
 
 func _ready() -> void:
@@ -40,6 +41,7 @@ func _build_slots() -> void:
 
 		slot.add_child(icon)
 		_grid.add_child(slot)
+		_slot_panels.append(slot)
 		_slot_icons.append(icon)
 
 
@@ -51,15 +53,30 @@ func _refresh_slots() -> void:
 	var items: Array[ItemData] = InventoryManager.get_slots()
 	for i: int in _slot_icons.size():
 		var icon: TextureRect = _slot_icons[i]
+		var slot: Panel = _slot_panels[i]
 		var item: ItemData = null
 		if i < items.size():
 			item = items[i]
 		if item != null:
 			icon.texture = _resolve_icon(item)
-			icon.tooltip_text = item.item_name
+			slot.tooltip_text = _format_tooltip(item)
 		else:
 			icon.texture = null
-			icon.tooltip_text = ""
+			slot.tooltip_text = ""
+
+
+## Builds the multi-line metadata tooltip shown when hovering an occupied slot.
+## Enum names are read from the `ItemData` enum dictionaries and title-cased so
+## the display stays in sync automatically if new types or rarities are added.
+func _format_tooltip(item: ItemData) -> String:
+	var type_name: String = ItemData.ItemType.keys()[item.item_type].capitalize()
+	var rarity_name: String = ItemData.Rarity.keys()[item.rarity].capitalize()
+	return "Name: %s\nType: %s\nRarity: %s\nSell Value: %d CP" % [
+		item.item_name,
+		type_name,
+		rarity_name,
+		item.sell_value_copper,
+	]
 
 
 ## Returns the item's own icon, or the shared placeholder when none is assigned.
