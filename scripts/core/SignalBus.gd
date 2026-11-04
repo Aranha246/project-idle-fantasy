@@ -32,3 +32,8 @@ signal item_dropped(item_data: ItemData, drop_position: Vector2)
 ## modified equipment slot and `item_data` is the newly equipped item, or `null`
 ## when the slot was cleared (unequipped).
 signal equipment_updated(slot_name: String, item_data: ItemData)
+
+## Emitted whenever player stats are recalculated.
+## `stats` is a Dictionary containing: "attack_power", "defense", "critical_rate", "luck"
+## Each entry is a Sub-Dictionary: {"base": float, "total": float, "bonus": float}
+signal stats_updated(stats: Dictionary)

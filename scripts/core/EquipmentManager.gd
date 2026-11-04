@@ -17,6 +17,8 @@ var _equipped: Array[ItemData] = []
 func _ready() -> void:
 	# All three slots start empty (`null`).
 	_equipped.resize(SLOT_NAMES.size())
+	for i in SLOT_NAMES.size():
+		_equipped[i] = null
 
 
 ## Returns the item equipped in `slot`, or `null` when the slot is empty or the
@@ -95,6 +97,11 @@ func unequip_item(slot: String) -> ItemData:
 	_equipped[slot_index] = null
 	SignalBus.equipment_updated.emit(slot, null)
 	return item
+
+
+## Read-only view of the current slots.
+func get_slots() -> Array[ItemData]:
+	return _equipped.duplicate()
 
 
 ## Returns the index of `slot` within `SLOT_NAMES`, or `-1` when the name is not

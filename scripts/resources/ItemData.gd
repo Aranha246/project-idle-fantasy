@@ -39,6 +39,12 @@ enum EquipmentSlot {
 @export var max_stack_size: int = 1
 @export var sell_value_copper: int = 0
 
+## Stat modifiers granted when this item is equipped.
+@export var attack_power_mod: float = 0.0
+@export var defense_mod: float = 0.0
+@export var critical_rate_mod: float = 0.0 # Additive (e.g., 0.05 for 5%)
+@export var luck_mod: float = 0.0 # Additive drop rate modifier
+
 ## The equipment slot this item may be equipped in. Keep it `EquipmentSlot.NONE`
 ## (the default) for anything that is not equippable.
 @export var equipment_slot: EquipmentSlot = EquipmentSlot.NONE

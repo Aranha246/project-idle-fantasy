@@ -1,0 +1,31 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/StatsUI.gd" id="1_stats"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stats"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.0901961, 0.0901961, 0.121569, 0.858824)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.301961, 0.278431, 0.352941, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="StatsUI" type="PanelContainer"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -840.0
+offset_top = 24.0
+offset_right = -648.0
+offset_bottom = 200.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_stats")
+script = ExtResource("1_stats")
