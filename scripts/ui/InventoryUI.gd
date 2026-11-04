@@ -6,6 +6,12 @@ const SLOT_COUNT: int = 20
 const SLOT_SIZE: float = 48.0
 const SLOT_ICON_MARGIN: float = 4.0
 
+## Placeholder shown whenever an item has no `item_icon` assigned (for example
+## items generated at runtime such as the default 'Rusty Dagger' loot).
+## `icon.svg` imports as a `CompressedTexture2D`, which is a `Texture2D`, so it
+## is safe to assign directly to any slot's `TextureRect.texture`.
+const DEFAULT_ITEM_ICON: Texture2D = preload("res://icon.svg")
+
 @onready var _grid: GridContainer = %InventoryGrid
 
 var _slot_icons: Array[TextureRect] = []
@@ -49,8 +55,18 @@ func _refresh_slots() -> void:
 		if i < items.size():
 			item = items[i]
 		if item != null:
-			icon.texture = item.item_icon
+			icon.texture = _resolve_icon(item)
 			icon.tooltip_text = item.item_name
 		else:
 			icon.texture = null
 			icon.tooltip_text = ""
+
+
+## Returns the item's own icon, or the shared placeholder when none is assigned.
+## Runtime-generated loot (e.g. the default 'Rusty Dagger') has a null
+## `item_icon`, so this guarantees every occupied slot renders a texture instead
+## of a blank cell and without logging missing-resource errors.
+func _resolve_icon(item: ItemData) -> Texture2D:
+	if item.item_icon != null:
+		return item.item_icon
+	return DEFAULT_ITEM_ICON
