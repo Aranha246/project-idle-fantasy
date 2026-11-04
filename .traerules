@@ -1,0 +1,12 @@
+# Godot 4.7 GDScript & Architecture Guidelines
+
+## Code Style & Formatting
+- Target Engine: Godot 4.7 (GDScript 2.0).
+- Explicitly declare types for variables, arguments, and return types (e.g., `var health: int = 100`, `func add_gold(amount: int) -> void:`).
+- Use `snake_case` for variables/functions, and `PascalCase` for Node names and ClassNames.
+- Always prefer Custom Resources (`@export var item: ItemData`) for item databases, enemy stats, and equipment instead of hardcoded Dictionaries.
+
+## Architecture & Signals
+- Never hardcode node paths like `$"../../UI/Label"`. Use Signals for upwards communication and direct function calls for downward node communication.
+- Keep UI strictly decoupled from Game Logic via Global Signals (`SignalBus.gd`).
+

@@ -1,0 +1,15 @@
+# Godot 4 auto-generated cache & imports
+.godot/
+*.import
+*.pck
+*.tscn.dep
+
+# Export outputs & builds
+build/
+bin/
+android/
+
+# Raw visual/audio assets (AI doesn't need to read raw PNG/WAV binaries)
+assets/textures/
+assets/audio/
+

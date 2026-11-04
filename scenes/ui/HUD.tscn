@@ -1,0 +1,45 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/HUD.gd" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="CopperLabel" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 344.0
+offset_bottom = 64.0
+theme_override_colors/font_color = Color(0.858824, 0.552941, 0.247059, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 32
+text = "0 CP"
+vertical_alignment = 1
+
+[node name="SilverLabel" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 72.0
+offset_right = 344.0
+offset_bottom = 112.0
+theme_override_colors/font_color = Color(0.823529, 0.839216, 0.870588, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 32
+text = "0 SP"
+vertical_alignment = 1
+
+[node name="GoldLabel" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 120.0
+offset_right = 344.0
+offset_bottom = 160.0
+theme_override_colors/font_color = Color(1, 0.843137, 0.25098, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 32
+text = "0 GP"
+vertical_alignment = 1
