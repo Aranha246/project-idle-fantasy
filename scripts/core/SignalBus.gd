@@ -11,3 +11,6 @@ signal currency_updated(copper: int, silver: int, gold: int)
 
 ## Emitted when an enemy is defeated, carrying the Copper reward to be granted.
 signal enemy_defeated(reward_copper: int)
+
+## Emitted whenever the contents of the player's inventory change.
+signal inventory_updated()

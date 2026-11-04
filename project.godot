@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 SignalBus="*res://scripts/core/SignalBus.gd"
 CurrencyManager="*res://scripts/core/CurrencyManager.gd"
 IdleQuestManager="*res://scripts/core/IdleQuestManager.gd"
+InventoryManager="*res://scripts/core/InventoryManager.gd"
 
 [display]
 

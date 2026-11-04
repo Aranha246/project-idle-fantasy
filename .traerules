@@ -10,3 +10,6 @@
 - Never hardcode node paths like `$"../../UI/Label"`. Use Signals for upwards communication and direct function calls for downward node communication.
 - Keep UI strictly decoupled from Game Logic via Global Signals (`SignalBus.gd`).
 
+[Language & Response Formatting]
+- Always respond exclusively in English. 
+- Do not mix Portuguese and English under any circumstances, including summary notes, git commit suggestions, or explanations.
