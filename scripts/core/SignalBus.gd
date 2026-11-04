@@ -15,6 +15,15 @@ signal enemy_defeated(reward_copper: int)
 ## Emitted whenever the contents of the player's inventory change.
 signal inventory_updated()
 
+## Emitted when a specific inventory slot is updated.
+signal slot_updated(index: int)
+
+## Emitted when the inventory is full and an item cannot be added.
+signal inventory_full()
+
+## Emitted after the inventory has been sorted and reorganized.
+signal inventory_reorganized()
+
 ## Emitted when a defeated enemy drops an item, with the drop position used
 ## for in-game feedback.
 signal item_dropped(item_data: ItemData, drop_position: Vector2)

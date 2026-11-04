@@ -9,6 +9,7 @@ extends ItemSlotUI
 const SLOT_SIZE: float = 48.0
 
 var _icon: TextureRect
+var _stack_label: Label
 
 
 func _ready() -> void:
@@ -27,17 +28,63 @@ func _ready() -> void:
 	_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_icon)
+	
+	_build_stack_label()
 
 
-## Updates the slot to display `new_item`, or clears it when `new_item` is null.
-func set_item(new_item: ItemData) -> void:
-	item = new_item
-	if new_item != null:
-		_icon.texture = resolve_item_icon(new_item)
-		tooltip_text = format_item_tooltip(new_item)
-	else:
+func _build_stack_label() -> void:
+	# Semi-transparent background for readability
+	var bg := Panel.new()
+	bg.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	bg.offset_left = -24
+	bg.offset_top = -18
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0.5)
+	style.set_corner_radius_all(2)
+	bg.add_theme_stylebox_override("panel", style)
+	add_child(bg)
+	
+	_stack_label = Label.new()
+	_stack_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_stack_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_stack_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_stack_label.add_theme_font_size_override("font_size", 12)
+	_stack_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.add_child(_stack_label)
+	
+	# Initial state
+	bg.visible = false
+
+
+## Updates the slot to display the contents of an `InventorySlot`.
+func set_item_slot(slot: InventorySlot) -> void:
+	if slot == null or slot.is_empty():
+		item = null
 		_icon.texture = null
 		tooltip_text = ""
+		_stack_label.get_parent().visible = false
+		return
+		
+	item = slot.item
+	_icon.texture = resolve_item_icon(item)
+	tooltip_text = format_item_tooltip(item)
+	
+	var count: int = slot.stack_count
+	if count > 1:
+		_stack_label.text = str(count)
+		_stack_label.get_parent().visible = true
+		
+		# Basic font scaling for large numbers
+		if count >= 1000:
+			_stack_label.add_theme_font_size_override("font_size", 9)
+		elif count >= 100:
+			_stack_label.add_theme_font_size_override("font_size", 10)
+		else:
+			_stack_label.add_theme_font_size_override("font_size", 12)
+	else:
+		_stack_label.get_parent().visible = false
 
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
