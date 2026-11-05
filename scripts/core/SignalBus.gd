@@ -89,3 +89,12 @@ signal pause_toggled(paused: bool)
 
 ## Emitted when the credits sequence has finished playing.
 signal credits_finished()
+
+## Emitted when a short, non-blocking message should be surfaced to the player,
+## such as feedback for a failed equip attempt. `is_error` marks failure
+## feedback so the UI can style it differently from informational messages.
+signal notification_raised(message: String, is_error: bool)
+
+## Emitted whenever a game window is opened or closed. `window_id` is the
+## window's stable id (see `WindowRegistry`) and `is_open` its new visibility.
+signal window_visibility_changed(window_id: StringName, is_open: bool)

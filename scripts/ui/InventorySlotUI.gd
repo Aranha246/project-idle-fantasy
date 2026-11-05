@@ -96,6 +96,28 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	return {"item": item, "source": "inventory", "slot": ""}
 
 
+## Right click or left double click equips straight into the item's first valid
+## slot. Single clicks are left untouched so drag & drop keeps working.
+func _gui_input(event: InputEvent) -> void:
+	if item == null or not is_equip_gesture(event):
+		return
+	accept_event()
+	_try_equip()
+
+
+## Equips the displayed item, reporting the precise reason through a toast when
+## it cannot be equipped (wrong type, level requirement, ...).
+func _try_equip() -> void:
+	var candidate: ItemData = item
+	if candidate == null:
+		return
+	var result: int = EquipmentManager.get_auto_equip_result(candidate)
+	if result != EquipmentManager.EquipResult.OK:
+		SignalBus.notification_raised.emit(equip_failure_message(result, candidate), true)
+		return
+	EquipmentManager.auto_equip(candidate)
+
+
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	# Only items dragged out of an equipment slot can be dropped here (unequip).
 	if typeof(data) != TYPE_DICTIONARY:

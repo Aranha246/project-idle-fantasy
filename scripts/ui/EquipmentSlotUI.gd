@@ -58,6 +58,27 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	return {"item": item, "source": "equipment", "slot": slot_name}
 
 
+## Right click or left double click unequips back into the inventory, mirroring
+## the equipping gestures available on inventory slots.
+func _gui_input(event: InputEvent) -> void:
+	if item == null or not is_equip_gesture(event):
+		return
+	accept_event()
+	_try_unequip()
+
+
+## Unequips the displayed item, explaining through a toast when the inventory
+## has no room for it.
+func _try_unequip() -> void:
+	var equipped: ItemData = item
+	if equipped == null:
+		return
+	if EquipmentManager.unequip_item(slot_name) == null:
+		SignalBus.notification_raised.emit(
+			"No inventory space to unequip %s." % equipped.item_name, true
+		)
+
+
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	if typeof(data) != TYPE_DICTIONARY:
 		return false

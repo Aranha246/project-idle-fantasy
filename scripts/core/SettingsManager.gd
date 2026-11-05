@@ -40,16 +40,36 @@ var reduce_motion: bool = false
 var high_contrast: bool = false
 var show_fps: bool = false
 
+# --- Keybindings -----------------------------------------------------------
+## Window id -> keycode. Owned here so rebindings persist and apply instantly.
+var keybindings: Dictionary = {}
+
+# --- Window layout ---------------------------------------------------------
+## Window id -> { "open": bool, "minimized": bool, "maximized": bool,
+## "position": Vector2 }. Kept out of the save game on purpose so window
+## placement survives even when there is no save to load.
+var window_layout: Dictionary = {}
+
+## Set once the initial load has finished. Mutators triggered by another
+## autoload before this point are applied in memory but not yet persisted, so an
+## early change can never overwrite the file with half-initialised values.
+var _config_ready: bool = false
+
 
 func _ready() -> void:
 	_ensure_audio_buses()
 	load_settings()
 	apply_all()
+	_apply_keybindings()
+	_config_ready = true
 
 
 ## Restores persisted values, falling back to the defaults on a fresh install
 ## or a corrupt file.
 func load_settings() -> void:
+	keybindings = WindowRegistry.get_default_bindings()
+	window_layout = _default_window_layout()
+
 	var config: ConfigFile = ConfigFile.new()
 	var error: Error = config.load(SETTINGS_PATH)
 	if error != OK:
@@ -70,6 +90,20 @@ func load_settings() -> void:
 	high_contrast = bool(config.get_value("accessibility", "high_contrast", high_contrast))
 	show_fps = bool(config.get_value("accessibility", "show_fps", show_fps))
 
+	for window_id: StringName in keybindings.keys():
+		keybindings[window_id] = int(
+			config.get_value("input", String(window_id), int(keybindings[window_id]))
+		)
+
+	for window_id: StringName in window_layout.keys():
+		var entry: Dictionary = window_layout[window_id]
+		var prefix: String = String(window_id)
+		entry["open"] = bool(config.get_value("windows", prefix + "_open", entry["open"]))
+		entry["minimized"] = bool(config.get_value("windows", prefix + "_minimized", entry["minimized"]))
+		entry["maximized"] = bool(config.get_value("windows", prefix + "_maximized", entry["maximized"]))
+		entry["position"] = config.get_value("windows", prefix + "_position", entry["position"])
+		window_layout[window_id] = entry
+
 	_sanitize()
 
 
@@ -88,6 +122,17 @@ func save_settings() -> void:
 	config.set_value("accessibility", "reduce_motion", reduce_motion)
 	config.set_value("accessibility", "high_contrast", high_contrast)
 	config.set_value("accessibility", "show_fps", show_fps)
+
+	for window_id: Variant in keybindings.keys():
+		config.set_value("input", String(window_id), int(keybindings[window_id]))
+
+	for window_id: Variant in window_layout.keys():
+		var entry: Dictionary = window_layout[window_id]
+		var prefix: String = String(window_id)
+		config.set_value("windows", prefix + "_open", bool(entry.get("open", false)))
+		config.set_value("windows", prefix + "_minimized", bool(entry.get("minimized", false)))
+		config.set_value("windows", prefix + "_maximized", bool(entry.get("maximized", false)))
+		config.set_value("windows", prefix + "_position", entry.get("position", Vector2.ZERO))
 
 	var error: Error = config.save(SETTINGS_PATH)
 	if error != OK:
@@ -154,6 +199,66 @@ func set_show_fps(enabled: bool) -> void:
 	_after_change()
 
 
+## Rebinds the window `window_id` to `keycode`.
+##
+## Returns the id of the window that already owns `keycode` when the binding was
+## rejected, or an empty `StringName` when it was applied. A key reserved by a
+## non-window action reports `WindowRegistry.RESERVED_BINDING`. Conflict
+## detection lives here rather than in the UI so every caller shares one rule.
+func set_keybinding(window_id: StringName, keycode: int) -> StringName:
+	if not keybindings.has(window_id):
+		return &""
+
+	if keycode == WindowRegistry.RESERVED_KEY:
+		return WindowRegistry.RESERVED_BINDING
+
+	if keycode != KEY_NONE:
+		var conflict: StringName = WindowRegistry.window_for_key(keybindings, keycode)
+		if conflict != &"" and conflict != window_id:
+			return conflict
+
+	keybindings[window_id] = keycode
+	_apply_keybindings()
+	_persist_only()
+	return &""
+
+
+## Restores every window shortcut to its authored default and applies it
+## immediately, without requiring a restart.
+func reset_keybindings() -> void:
+	keybindings = WindowRegistry.get_default_bindings()
+	_apply_keybindings()
+	_persist_only()
+
+
+## Persists whether `window_id` is currently open.
+func set_window_open(window_id: StringName, is_open: bool) -> void:
+	_update_window_entry(window_id, "open", is_open)
+
+
+## Persists the on-screen position of `window_id`.
+func set_window_position(window_id: StringName, position: Vector2) -> void:
+	_update_window_entry(window_id, "position", position)
+
+
+## Persists whether `window_id` is collapsed to its title bar.
+func set_window_minimized(window_id: StringName, minimized: bool) -> void:
+	_update_window_entry(window_id, "minimized", minimized)
+
+
+## Persists whether `window_id` fills the work area.
+func set_window_maximized(window_id: StringName, maximized: bool) -> void:
+	_update_window_entry(window_id, "maximized", maximized)
+
+
+## Returns a copy of the persisted layout for `window_id`, or an empty
+## dictionary when the id is not a known window.
+func get_window_layout(window_id: StringName) -> Dictionary:
+	if not window_layout.has(window_id):
+		return {}
+	return (window_layout[window_id] as Dictionary).duplicate()
+
+
 ## Restores every option to its default and applies it immediately.
 func reset_to_defaults() -> void:
 	window_mode = WindowMode.WINDOWED
@@ -165,7 +270,10 @@ func reset_to_defaults() -> void:
 	reduce_motion = false
 	high_contrast = false
 	show_fps = false
+	keybindings = WindowRegistry.get_default_bindings()
+	window_layout = _default_window_layout()
 	apply_all()
+	_apply_keybindings()
 	_after_change()
 
 
@@ -195,11 +303,88 @@ func _sanitize() -> void:
 	master_volume = clampf(master_volume, 0.0, 1.0)
 	music_volume = clampf(music_volume, 0.0, 1.0)
 	sfx_volume = clampf(sfx_volume, 0.0, 1.0)
+	_sanitize_keybindings()
+	_sanitize_window_layout()
+
+
+## Repairs a loaded binding set so every known window has a key and no two
+## windows share one, which a hand-edited file could otherwise cause.
+func _sanitize_keybindings() -> void:
+	var defaults: Dictionary = WindowRegistry.get_default_bindings()
+	var claimed: Dictionary = {}
+	for window_id: StringName in defaults.keys():
+		var keycode: int = int(keybindings.get(window_id, int(defaults[window_id])))
+		if keycode == KEY_NONE or keycode == WindowRegistry.RESERVED_KEY or claimed.has(keycode):
+			var fallback: int = int(defaults[window_id])
+			keycode = fallback if not claimed.has(fallback) else KEY_NONE
+		keybindings[window_id] = keycode
+		if keycode != KEY_NONE:
+			claimed[keycode] = window_id
+
+
+## Repairs a loaded layout so every known window has a well-formed entry.
+func _sanitize_window_layout() -> void:
+	var defaults: Dictionary = _default_window_layout()
+	for window_id: StringName in defaults.keys():
+		var fallback: Dictionary = defaults[window_id]
+		if not window_layout.has(window_id):
+			window_layout[window_id] = fallback
+			continue
+		var entry: Dictionary = window_layout[window_id]
+		entry["open"] = bool(entry.get("open", fallback["open"]))
+		entry["minimized"] = bool(entry.get("minimized", false))
+		entry["maximized"] = bool(entry.get("maximized", false))
+		var position: Variant = entry.get("position", fallback["position"])
+		entry["position"] = position if position is Vector2 else fallback["position"]
+		window_layout[window_id] = entry
+
+
+## The first-run layout: every window at its authored position, closed unless it
+## opted into opening by default.
+func _default_window_layout() -> Dictionary:
+	var layout: Dictionary = {}
+	for definition: WindowData in WindowRegistry.get_definitions():
+		layout[definition.window_id] = {
+			"open": definition.open_by_default,
+			"minimized": false,
+			"maximized": false,
+			"position": definition.default_position,
+		}
+	return layout
+
+
+## Writes one field of a window's layout entry and persists the result.
+func _update_window_entry(window_id: StringName, key: String, value: Variant) -> void:
+	if not window_layout.has(window_id):
+		return
+	var entry: Dictionary = (window_layout[window_id] as Dictionary).duplicate()
+	entry[key] = value
+	window_layout[window_id] = entry
+	_after_change()
+
+
+## Pushes the current bindings into the `InputMap` so a rebind takes effect
+## immediately, with no restart.
+func _apply_keybindings() -> void:
+	InputActions.apply_window_bindings(keybindings)
 
 
 func _after_change() -> void:
+	if not _config_ready:
+		return
 	save_settings()
 	SignalBus.settings_changed.emit(get_snapshot())
+
+
+## Persists without broadcasting `settings_changed`.
+##
+## Used by changes that only affect input routing (keybindings): they must be
+## written to disk immediately but must not force the UI to rebuild its theme,
+## which would be a needless repaint for something no widget displays.
+func _persist_only() -> void:
+	if not _config_ready:
+		return
+	save_settings()
 
 
 func _ensure_audio_buses() -> void:

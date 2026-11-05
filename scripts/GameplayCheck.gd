@@ -53,12 +53,14 @@ func _run() -> void:
 	_test_loot_roller()
 	_test_inventory_capacity()
 	_test_equipment_slots()
+	_test_equip_gestures()
 	_test_upgrades()
 	_test_quest_is_player_driven()
 	await _test_quest_claim_grants_rewards()
 	await _test_quest_claim_drops_equipment()
 	_test_progression_pacing()
 	_test_save_persistence()
+	_test_window_system()
 	await _test_main_ui_wiring()
 	_cleanup()
 	_finish()
@@ -163,6 +165,18 @@ func _test_equipment_slots() -> void:
 	var sword: ItemData = GameDatabase.get_item(&"iron_sword")
 	var shield: ItemData = GameDatabase.get_item(&"wooden_shield")
 	var ring: ItemData = GameDatabase.get_item(&"copper_ring")
+	_assert(sword != null and shield != null and ring != null, "the catalogue ships a weapon, a shield and a ring")
+	if sword == null or shield == null or ring == null:
+		return
+
+	# Equip eligibility also requires the item to be held, so put the samples in
+	# the bag before asking which slot each one fits.
+	EquipmentManager.load_state({})
+	InventoryManager.load_state([])
+	InventoryManager.add_item(sword, 1)
+	InventoryManager.add_item(shield, 1)
+	InventoryManager.add_item(ring, 1)
+
 	_assert(EquipmentManager.can_equip_in(sword, "WEAPON"), "a weapon fits the weapon slot")
 	_assert(not EquipmentManager.can_equip_in(sword, "OFF_HAND"), "a weapon does not fit the off-hand slot")
 	_assert(EquipmentManager.can_equip_in(shield, "OFF_HAND"), "a shield fits the off-hand slot")
@@ -196,6 +210,84 @@ func _test_equipment_slots() -> void:
 			empty_slots += 1
 	_assert(empty_slots == 13, "a fresh profile starts with thirteen empty equipment slots")
 
+	EquipmentManager.load_state({})
+	InventoryManager.load_state([])
+
+
+# --- Equipping gestures -----------------------------------------------------
+
+## Covers the two equipping gestures from the request: right click and left
+## double click equip from the bag, the same gestures unequip from the character
+## window, and a rejected equip explains itself through a toast.
+func _test_equip_gestures() -> void:
+	# Gesture recognition is shared by both slot types.
+	_assert(ItemSlotUI.is_equip_gesture(_mouse_event(MOUSE_BUTTON_RIGHT)), "a right click is an equip gesture")
+	_assert(
+		not ItemSlotUI.is_equip_gesture(_mouse_event(MOUSE_BUTTON_RIGHT, false)),
+		"releasing the right button is not an equip gesture"
+	)
+	_assert(
+		ItemSlotUI.is_equip_gesture(_mouse_event(MOUSE_BUTTON_LEFT, true, true)),
+		"a left double click is an equip gesture"
+	)
+	_assert(
+		not ItemSlotUI.is_equip_gesture(_mouse_event(MOUSE_BUTTON_LEFT)),
+		"a single left click is not an equip gesture, so drag & drop keeps working"
+	)
+
+	var toasts: Array = []
+	SignalBus.notification_raised.connect(func(message: String, is_error: bool) -> void:
+		toasts.append([message, is_error])
+	)
+
+	# Right-clicking a bag item equips it straight into its slot.
+	EquipmentManager.load_state({})
+	InventoryManager.load_state([])
+	var sword: ItemData = GameDatabase.get_item(&"iron_sword")
+	InventoryManager.add_item(sword, 1)
+	var bag_slot: InventorySlotUI = InventorySlotUI.new()
+	get_tree().root.add_child(bag_slot)
+	bag_slot.item = sword
+	bag_slot._gui_input(_mouse_event(MOUSE_BUTTON_RIGHT))
+	_assert(EquipmentManager.get_equipped("WEAPON") == sword, "right-clicking a bag item equips it into its slot")
+	_assert(not InventoryManager.has_item(sword), "equipping moves the item out of the bag")
+	_assert(toasts.is_empty(), "a successful equip raises no error toast")
+
+	# A left double click has exactly the same effect.
+	EquipmentManager.load_state({})
+	InventoryManager.load_state([])
+	InventoryManager.add_item(sword, 1)
+	bag_slot.item = sword
+	bag_slot._gui_input(_mouse_event(MOUSE_BUTTON_LEFT, true, true))
+	_assert(EquipmentManager.get_equipped("WEAPON") == sword, "double-clicking a bag item also equips it")
+
+	# The same gestures unequip from the character window.
+	var equipment_slot: EquipmentSlotUI = EquipmentSlotUI.new()
+	equipment_slot.slot_name = "WEAPON"
+	equipment_slot.slot_label = "Weapon"
+	get_tree().root.add_child(equipment_slot)
+	equipment_slot.refresh()
+	var toasts_before: int = toasts.size()
+	equipment_slot._gui_input(_mouse_event(MOUSE_BUTTON_RIGHT))
+	_assert(EquipmentManager.get_equipped("WEAPON") == null, "right-clicking an equipped item unequips it")
+	_assert(InventoryManager.has_item(sword), "the unequipped item returns to the bag")
+	_assert(toasts.size() == toasts_before, "a successful unequip raises no error toast")
+
+	# A rejected equip explains itself instead of failing silently.
+	EquipmentManager.load_state({})
+	InventoryManager.load_state([])
+	var potion: ItemData = GameDatabase.get_item(&"health_potion")
+	InventoryManager.add_item(potion, 1)
+	bag_slot.item = potion
+	bag_slot._gui_input(_mouse_event(MOUSE_BUTTON_LEFT, true, true))
+	_assert(EquipmentManager.get_equipped("WEAPON") == null, "a consumable is never equipped")
+	_assert(
+		toasts.size() == toasts_before + 1 and bool(toasts[toasts.size() - 1][1]),
+		"a rejected equip raises an error toast"
+	)
+
+	bag_slot.queue_free()
+	equipment_slot.queue_free()
 	EquipmentManager.load_state({})
 	InventoryManager.load_state([])
 
@@ -477,6 +569,94 @@ func _test_save_persistence() -> void:
 	CurrencyManager.load_state({"copper": 0, "silver": 0, "gold": 0})
 
 
+# --- Window system & keybindings --------------------------------------------
+
+## Covers the Path of Exile-style window system: every window ships a default
+## shortcut, rebinding applies instantly, conflicts and reserved keys are
+## rejected, and the layout survives a simulated client restart.
+func _test_window_system() -> void:
+	var window_ids: Array[StringName] = WindowRegistry.get_window_ids()
+	_assert(window_ids.size() >= 5, "the registry authors several floating windows")
+
+	var defaults: Dictionary = WindowRegistry.get_default_bindings()
+	_assert(defaults.size() == window_ids.size(), "every window ships a default keybinding")
+	_assert(int(defaults[WindowRegistry.CHARACTER_ID]) == int(KEY_C), "the character window defaults to C")
+	_assert(SettingsManager.keybindings.size() == window_ids.size(), "the live bindings cover every window")
+
+	# --- rebinding applies immediately, with no restart ---------------------
+	var conflict: StringName = SettingsManager.set_keybinding(WindowRegistry.STATS_ID, int(KEY_K))
+	_assert(conflict == &"", "a free key rebinds without a conflict")
+	_assert(int(SettingsManager.keybindings[WindowRegistry.STATS_ID]) == int(KEY_K), "the rebind is stored")
+	_assert(
+		_action_uses_key(InputActions.window_action(WindowRegistry.STATS_ID), KEY_K),
+		"the rebind reaches the input map without a restart"
+	)
+
+	# --- conflict detection -------------------------------------------------
+	conflict = SettingsManager.set_keybinding(WindowRegistry.STATS_ID, int(KEY_J))
+	_assert(conflict == WindowRegistry.QUESTS_ID, "a key owned by another window is rejected and names the owner")
+	_assert(int(SettingsManager.keybindings[WindowRegistry.STATS_ID]) == int(KEY_K), "a rejected rebind changes nothing")
+
+	# --- the pause key stays reserved --------------------------------------
+	conflict = SettingsManager.set_keybinding(WindowRegistry.STATS_ID, int(KEY_ESCAPE))
+	_assert(conflict == WindowRegistry.RESERVED_BINDING, "the pause key cannot be assigned to a window")
+
+	# --- reset to defaults --------------------------------------------------
+	SettingsManager.reset_keybindings()
+	_assert(int(SettingsManager.keybindings[WindowRegistry.STATS_ID]) == int(KEY_P), "resetting restores the default binding")
+	_assert(
+		_action_uses_key(InputActions.window_action(WindowRegistry.STATS_ID), KEY_P),
+		"the reset reaches the input map without a restart"
+	)
+
+	# --- window visibility is broadcast on SignalBus ------------------------
+	WindowManager.reset_to_defaults()
+	var visibility_events: Array = []
+	SignalBus.window_visibility_changed.connect(
+		func(window_id: StringName, is_open: bool) -> void:
+			visibility_events.append([window_id, is_open])
+	)
+	_assert(WindowManager.is_open(WindowRegistry.CHARACTER_ID), "the character window opens by default")
+	WindowManager.toggle_window(WindowRegistry.CHARACTER_ID)
+	_assert(not WindowManager.is_open(WindowRegistry.CHARACTER_ID), "toggling closes an open window")
+	_assert(
+		visibility_events.size() == 1 and visibility_events[0][0] == WindowRegistry.CHARACTER_ID,
+		"a window toggle is broadcast on SignalBus"
+	)
+	WindowManager.toggle_window(WindowRegistry.CHARACTER_ID)
+	_assert(WindowManager.is_open(WindowRegistry.CHARACTER_ID), "toggling again reopens the window")
+
+	# --- persistence survives a simulated restart ---------------------------
+	WindowManager.set_open(WindowRegistry.QUESTS_ID, true)
+	WindowManager.set_open(WindowRegistry.STATS_ID, false)
+	SettingsManager.set_window_position(WindowRegistry.QUESTS_ID, Vector2(210.0, 130.0))
+	SettingsManager.set_window_minimized(WindowRegistry.QUESTS_ID, true)
+	SettingsManager.set_window_maximized(WindowRegistry.UPGRADES_ID, true)
+
+	# Corrupt the runtime state, then reload the file and resync exactly as a
+	# fresh client boot would, proving the file is the source of truth.
+	WindowManager._open[WindowRegistry.QUESTS_ID] = false
+	WindowManager._open[WindowRegistry.STATS_ID] = true
+	WindowManager._open[WindowRegistry.UPGRADES_ID] = false
+	SettingsManager.load_settings()
+	WindowManager.sync_from_settings()
+
+	_assert(WindowManager.is_open(WindowRegistry.QUESTS_ID), "a window open at exit reopens on the next launch")
+	_assert(not WindowManager.is_open(WindowRegistry.STATS_ID), "a window closed at exit stays closed on the next launch")
+	var restored: Dictionary = SettingsManager.get_window_layout(WindowRegistry.QUESTS_ID)
+	_assert(restored.get("position", Vector2.ZERO) == Vector2(210.0, 130.0), "the window position survives a restart")
+	_assert(bool(restored.get("minimized", false)), "the minimized state survives a restart")
+	_assert(
+		bool(SettingsManager.get_window_layout(WindowRegistry.UPGRADES_ID).get("maximized", false)),
+		"the maximized state survives a restart"
+	)
+	_assert(FileAccess.file_exists(SettingsManager.SETTINGS_PATH), "the window layout is written to the settings file")
+
+	# Leave the authored defaults in place for the remaining suites.
+	WindowManager.reset_to_defaults()
+	SettingsManager.reset_to_defaults()
+
+
 # --- UI wiring (player agency end to end) -----------------------------------
 
 func _test_main_ui_wiring() -> void:
@@ -489,28 +669,54 @@ func _test_main_ui_wiring() -> void:
 	get_tree().root.add_child(main)
 	await _settle()
 
-	_assert(_collect_scroll_containers(main).is_empty(), "the redesigned HUD has no scrolling containers")
-
-	var tabs: TabContainer = _find_tab_container(main)
-	_assert(tabs != null, "the HUD is built from a tab container")
-	if tabs == null:
+	var menu_bar: MenuBarUI = main.get_node_or_null("HUDRoot/HUDRootMargin/HUDRootBox/MenuBar") as MenuBarUI
+	var window_host: WindowHostUI = main.get_node_or_null("HUDRoot/HUDRootMargin/HUDRootBox/WindowHost") as WindowHostUI
+	_assert(menu_bar != null, "the persistent menu bar is mounted")
+	_assert(window_host != null, "the floating window host is mounted")
+	if menu_bar == null or window_host == null:
 		main.queue_free()
+		await _settle()
 		return
-	_assert(tabs.get_tab_count() == 5, "the HUD exposes five tabs")
 
-	var has_quests: bool = false
-	var has_upgrades: bool = false
-	for i: int in tabs.get_tab_count():
-		var title: String = tabs.get_tab_title(i)
-		if title == "Quests":
-			has_quests = true
-		elif title == "Upgrades":
-			has_upgrades = true
-	_assert(has_quests, "the quest board has its own tab")
-	_assert(has_upgrades, "the upgrade shop has its own tab")
+	# The persistent chrome must never scroll; only window bodies may.
+	_assert(_collect_scroll_containers(menu_bar).is_empty(), "the menu bar has no scrolling containers")
+	var status_bar: Control = main.get_node_or_null("HUDRoot/HUDRootMargin/HUDRootBox/StatusBar") as Control
+	_assert(
+		status_bar != null and _collect_scroll_containers(status_bar).is_empty(),
+		"the status bar has no scrolling containers"
+	)
+
+	# Every authored floating window is mounted and listed in the menu bar. The
+	# settings entry is the exception: it opens the existing modal overlay.
+	var floating_ids: Array[StringName] = []
+	for window_id: StringName in WindowRegistry.get_window_ids():
+		if window_id != WindowRegistry.SETTINGS_ID:
+			floating_ids.append(window_id)
+	var mounted: int = 0
+	var listed: int = 0
+	for window_id: StringName in floating_ids:
+		if window_host.get_game_window(window_id) != null:
+			mounted += 1
+		if menu_bar.get_toggle(window_id) != null:
+			listed += 1
+	_assert(mounted == floating_ids.size(), "the window host mounts every floating window")
+	_assert(listed == floating_ids.size(), "the menu bar lists every floating window")
+	_assert(menu_bar.get_toggle(WindowRegistry.SETTINGS_ID) != null, "the menu bar also lists the settings window")
+
+	# The unified Character window carries the equipment slots and the bag.
+	var character: GameWindow = window_host.get_game_window(WindowRegistry.CHARACTER_ID)
+	_assert(character != null, "the unified character window is mounted")
+	if character != null:
+		_assert(_find_first(character, "EquipmentList") != null, "the character window shows the equipment slots")
+		_assert(_find_first(character, "InventoryGrid") != null, "the character window shows the inventory grid")
+
+	# Quests live in their own window; open it so the board lays out.
+	WindowManager.set_open(WindowRegistry.QUESTS_ID, true)
+	await _settle()
+	_assert(WindowManager.is_open(WindowRegistry.QUESTS_ID), "the quest window can be opened")
 
 	var hero: HeroArt = _find_first(main, "HeroArt") as HeroArt
-	_assert(hero != null, "the animated hero artwork is mounted in the quest board")
+	_assert(hero != null, "the animated hero artwork is mounted in the quest window")
 	_assert(hero != null and hero.get_frame_count() > 0, "the hero sprite frames load from the shipped art")
 
 	# Every authored hero frame must ship, because the hero art no longer has a
@@ -529,10 +735,10 @@ func _test_main_ui_wiring() -> void:
 	QuestManager.abandon_quest()
 	QuestManager.set_active_zone_by_id(&"whispering_woods")
 	await _settle()
-	_assert(not QuestManager.is_quest_running(), "loading the HUD never starts a quest on its own")
+	_assert(not QuestManager.is_quest_running(), "loading the windows never starts a quest on its own")
 
 	var quest_button: Button = _first_quest_button(main)
-	_assert(quest_button != null, "the quest board lists startable quests")
+	_assert(quest_button != null, "the quest window lists startable quests")
 	if quest_button != null:
 		quest_button.pressed.emit()
 		await _settle()
@@ -546,12 +752,13 @@ func _test_main_ui_wiring() -> void:
 			await _settle()
 			_assert(not QuestManager.is_quest_running(), "the action button can cancel a running quest")
 
-	# The upgrade shop spends currency from the UI.
+	# The upgrade shop spends currency from its own window.
+	WindowManager.set_open(WindowRegistry.UPGRADES_ID, true)
 	CurrencyManager.load_state({"copper": 0, "silver": 0, "gold": 0})
 	CurrencyManager.add_copper(100_000)
 	await _settle()
 	var buy_button: Button = _first_buy_button(main)
-	_assert(buy_button != null, "the upgrade shop lists buyable upgrades")
+	_assert(buy_button != null, "the upgrade window lists buyable upgrades")
 	if buy_button != null:
 		var levels_before: int = _total_upgrade_levels()
 		buy_button.pressed.emit()
@@ -560,10 +767,13 @@ func _test_main_ui_wiring() -> void:
 
 	main.queue_free()
 	await _settle()
+	WindowManager.reset_to_defaults()
 
 
 func _cleanup() -> void:
 	get_tree().paused = false
+	WindowManager.reset_to_defaults()
+	SettingsManager.reset_to_defaults()
 	QuestManager.abandon_quest()
 	QuestManager.set_active_zone_by_id(&"whispering_woods")
 	UpgradeManager.load_state({})
@@ -621,12 +831,24 @@ func _find_first(root_node: Node, node_name: String) -> Node:
 	return null
 
 
-func _find_tab_container(root_node: Node) -> TabContainer:
-	for node: Node in _collect_nodes(root_node):
-		var tabs: TabContainer = node as TabContainer
-		if tabs != null:
-			return tabs
-	return null
+## Builds a synthetic mouse-button event for the equipping-gesture checks.
+func _mouse_event(button: MouseButton, pressed: bool = true, double_click: bool = false) -> InputEventMouseButton:
+	var event: InputEventMouseButton = InputEventMouseButton.new()
+	event.button_index = button
+	event.pressed = pressed
+	event.double_click = double_click
+	return event
+
+
+## Whether the `InputMap` action currently carries a keyboard binding for `keycode`.
+func _action_uses_key(action: StringName, keycode: Key) -> bool:
+	if not InputMap.has_action(action):
+		return false
+	for event: InputEvent in InputMap.action_get_events(action):
+		var key_event: InputEventKey = event as InputEventKey
+		if key_event != null and key_event.physical_keycode == keycode:
+			return true
+	return false
 
 
 func _collect_scroll_containers(root_node: Node) -> Array[ScrollContainer]:

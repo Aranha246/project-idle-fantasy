@@ -97,6 +97,18 @@ const SLOT_LABELS: Array[String] = [
 ## (the default) for anything that is not equippable.
 @export var equipment_slot: EquipmentSlot = EquipmentSlot.NONE
 
+## Minimum character level required to equip this item. `0` (the default) means
+## the item has no requirement, which is always the case for anything that is
+## not equippable.
+@export var required_level: int = 0
+
+
+## Returns `true` when a character at `character_level` is allowed to equip this
+## item. Items without a requirement (and every non-equippable item) always
+## pass, so callers can rely on a single check.
+func meets_level_requirement(character_level: int) -> bool:
+	return required_level <= 0 or character_level >= required_level
+
 
 ## Returns `true` only for valid equipment categories, guarding every equipment
 ## operation against invalid slot assignments.

@@ -54,3 +54,31 @@ func attach_drag_preview(source_item: ItemData) -> void:
 	var viewport: Viewport = get_viewport()
 	if viewport != null and viewport.gui_is_dragging():
 		set_drag_preview(build_drag_preview(source_item))
+
+
+## Player-facing explanation for a rejected equip request, naming the item and,
+## where it helps, the requirement that was not met.
+func equip_failure_message(result: int, source_item: ItemData) -> String:
+	if source_item == null:
+		return "Nothing to equip."
+	if result == EquipmentManager.EquipResult.LEVEL_TOO_LOW:
+		return "%s requires level %d." % [source_item.item_name, source_item.required_level]
+	if result == EquipmentManager.EquipResult.WRONG_SLOT:
+		return "%s does not fit any of your slots." % source_item.item_name
+	if result == EquipmentManager.EquipResult.NOT_EQUIPPABLE:
+		return "%s cannot be equipped." % source_item.item_name
+	if result == EquipmentManager.EquipResult.NOT_IN_INVENTORY:
+		return "%s is not in your inventory." % source_item.item_name
+	return "Cannot equip %s." % source_item.item_name
+
+
+## Returns `true` when `event` is one of the two equipping gestures: a right
+## click, or a left double click. Shared so inventory and equipment slots react
+## to exactly the same gestures.
+static func is_equip_gesture(event: InputEvent) -> bool:
+	var mouse_button: InputEventMouseButton = event as InputEventMouseButton
+	if mouse_button == null or not mouse_button.pressed:
+		return false
+	if mouse_button.button_index == MOUSE_BUTTON_RIGHT:
+		return true
+	return mouse_button.button_index == MOUSE_BUTTON_LEFT and mouse_button.double_click

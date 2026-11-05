@@ -1,18 +1,19 @@
 extends Node2D
 ## Root scene controller.
 ##
-## The HUD no longer uses any scrolling containers. Instead, the interface is
-## split into five responsive tabs:
+## The interface is a persistent chrome wrapped around a floating window system,
+## modelled on action-RPGs such as Path of Exile:
 ##
-## - Overview: currency, zone selection, and character stats
-## - Quests: the player-driven quest board (with the animated hero)
-## - Upgrades: the currency upgrade shop
-## - Equipment: equipment management
-## - Inventory: inventory management
+## - a menu bar listing every game window, always visible at the top,
+## - a floating window host in the middle, where each window can be dragged,
+##   minimized, maximized and closed independently, with several open at once,
+## - a status bar along the bottom carrying level, experience and currency,
+## - and a toast strip for short, non-blocking feedback such as a rejected
+##   equip attempt.
 ##
-## This keeps every panel fully visible on supported resolutions without
-## horizontal or vertical scrollbars. The overview screen swaps between a
-## side-by-side layout on wider viewports and a stacked layout on narrower ones.
+## None of the chrome scrolls. Content that can outgrow its window scrolls inside
+## that window's body instead, so every panel stays reachable on small screens
+## without the interface ever growing scrollbars of its own.
 ##
 ## Responsibilities beyond layout:
 ##
@@ -25,12 +26,11 @@ extends Node2D
 ## - and an optional on-screen FPS counter.
 
 const SCREEN_MARGIN: int = 16
-const PANEL_GAP: int = 12
+const PANEL_GAP: int = 10
 const UI_LAYER: int = 1
+const TOAST_LAYER: int = 60
 const BACKGROUND_LAYER: int = -1
 const FPS_LAYER: int = 50
-const WIDE_LAYOUT_MIN_WIDTH: float = 720.0
-const WIDE_LAYOUT_MIN_HEIGHT: float = 340.0
 
 const FPS_LABEL_INSET: float = 10.0
 const FPS_LABEL_FONT_SIZE: int = 13
@@ -43,23 +43,10 @@ const UPGRADE_SCENE: String = "res://scenes/ui/UpgradeUI.tscn"
 const EQUIPMENT_SCENE: String = "res://scenes/ui/EquipmentUI.tscn"
 const INVENTORY_SCENE: String = "res://scenes/ui/InventoryUI.tscn"
 
-var _tabs: TabContainer = null
-var _overview_wide_row: HBoxContainer = null
-var _overview_wide_zone_host: VBoxContainer = null
-var _overview_wide_sidebar: VBoxContainer = null
-var _overview_narrow_column: VBoxContainer = null
-var _quests_host: MarginContainer = null
-var _upgrades_host: MarginContainer = null
-var _equipment_host: CenterContainer = null
-var _inventory_host: CenterContainer = null
-
-var _hud_panel: Control = null
-var _zone_panel: Control = null
-var _stats_panel: Control = null
-var _quest_panel: Control = null
-var _upgrade_panel: Control = null
-var _equipment_panel: Control = null
-var _inventory_panel: Control = null
+var _menu_bar: MenuBarUI = null
+var _window_host: WindowHostUI = null
+var _status_bar: Control = null
+var _toasts: ToastUI = null
 
 var _hud_theme_root: Control = null
 var _fps_label: Label = null
@@ -83,10 +70,9 @@ func _ready() -> void:
 
 	_build_background()
 	_build_hud_root()
-	_instantiate_panels()
-	_assign_static_panels()
-	_refresh_overview_layout()
+	_build_windows()
 	_build_overlays()
+	_build_toasts()
 	_build_fps_overlay()
 
 	# Restore a previous session before the first frame so the HUD starts with
@@ -94,7 +80,12 @@ func _ready() -> void:
 	if SaveManager.has_save():
 		SaveManager.load_game()
 
+	# The window system is authoritative for what is open; mirror it into the
+	# chrome once everything exists, then follow it from here on.
+	_sync_window_chrome()
+
 	SignalBus.settings_changed.connect(_on_settings_changed)
+	SignalBus.window_visibility_changed.connect(_on_window_visibility_changed)
 
 	var viewport: Viewport = get_viewport()
 	if viewport != null and not viewport.size_changed.is_connected(_on_viewport_resized):
@@ -115,12 +106,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if _settings_menu != null and _settings_menu.visible:
-		_settings_menu.set_shown(false)
+		WindowManager.set_open(WindowRegistry.SETTINGS_ID, false)
 		get_viewport().set_input_as_handled()
 		return
 	_toggle_pause()
 	get_viewport().set_input_as_handled()
 
+
+# --- Chrome ----------------------------------------------------------------
 
 func _build_background() -> void:
 	var layer: CanvasLayer = CanvasLayer.new()
@@ -194,6 +187,90 @@ func _update_ambient_bounds() -> void:
 	_ambient_particles.emitting = not SettingsManager.reduce_motion
 
 
+## Builds the fixed chrome: the menu bar on top, the floating window host in the
+## middle and the status bar along the bottom. None of these scroll.
+func _build_hud_root() -> void:
+	var ui_layer: CanvasLayer = CanvasLayer.new()
+	ui_layer.name = "HUDRoot"
+	ui_layer.layer = UI_LAYER
+	add_child(ui_layer)
+
+	var root_margin: MarginContainer = MarginContainer.new()
+	root_margin.name = "HUDRootMargin"
+	root_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root_margin.add_theme_constant_override("margin_left", SCREEN_MARGIN)
+	root_margin.add_theme_constant_override("margin_top", SCREEN_MARGIN)
+	root_margin.add_theme_constant_override("margin_right", SCREEN_MARGIN)
+	root_margin.add_theme_constant_override("margin_bottom", SCREEN_MARGIN)
+	root_margin.theme = _ui_theme
+	ui_layer.add_child(root_margin)
+	_hud_theme_root = root_margin
+
+	var root_box: VBoxContainer = VBoxContainer.new()
+	root_box.name = "HUDRootBox"
+	root_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root_box.add_theme_constant_override("separation", PANEL_GAP)
+	root_margin.add_child(root_box)
+
+	_menu_bar = MenuBarUI.new()
+	_menu_bar.setup(WindowRegistry.get_definitions())
+	_menu_bar.window_pressed.connect(_on_menu_window_pressed)
+	_menu_bar.set_ui_theme(_ui_theme)
+	root_box.add_child(_menu_bar)
+
+	_window_host = WindowHostUI.new()
+	_window_host.name = "WindowHost"
+	_window_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_window_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root_box.add_child(_window_host)
+
+	_status_bar = _build_status_bar()
+	root_box.add_child(_status_bar)
+
+
+## The status bar reuses the existing HUD panel (level, XP and the three
+## currencies) stretched across the bottom of the screen.
+func _build_status_bar() -> Control:
+	var bar: HBoxContainer = HBoxContainer.new()
+	bar.name = "StatusBar"
+	bar.add_theme_constant_override("separation", PANEL_GAP)
+
+	var hud_panel: Control = _instantiate_panel(HUD_SCENE)
+	if hud_panel != null:
+		hud_panel.name = "HUD"
+		hud_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.add_child(hud_panel)
+	return bar
+
+
+## Instantiates every game panel and hands it to the window host. Windows are
+## built once, up front, and simply hidden while closed, so opening one never
+## stalls and each keeps its position for the whole session.
+func _build_windows() -> void:
+	_register_panel_window(WindowRegistry.QUESTS_ID, QUEST_SCENE)
+	_register_panel_window(WindowRegistry.UPGRADES_ID, UPGRADE_SCENE)
+	_register_panel_window(WindowRegistry.MAP_ID, ZONE_SCENE)
+	_register_panel_window(WindowRegistry.STATS_ID, STATS_SCENE)
+
+	# The unified Character window consolidates the equipment grid and the
+	# inventory into one layout, which is what makes item transfer seamless.
+	var equipment_panel: Control = _instantiate_panel(EQUIPMENT_SCENE)
+	var inventory_panel: Control = _instantiate_panel(INVENTORY_SCENE)
+	var character: CharacterWindowUI = CharacterWindowUI.new()
+	character.setup(equipment_panel, inventory_panel)
+	_window_host.register_window(WindowRegistry.CHARACTER_ID, character)
+
+	_window_host.set_ui_theme(_ui_theme)
+
+
+func _register_panel_window(window_id: StringName, scene_path: String) -> void:
+	var panel: Control = _instantiate_panel(scene_path)
+	if panel == null:
+		return
+	_window_host.register_window(window_id, panel)
+
+
 func _build_overlays() -> void:
 	_pause_menu = PauseMenu.new()
 	add_child(_pause_menu)
@@ -213,6 +290,19 @@ func _build_overlays() -> void:
 	add_child(_credits)
 	_credits.set_ui_theme(_ui_theme)
 	_credits.closed.connect(_on_credits_closed)
+
+
+## Toasts sit above the floating windows but below the modal overlays, so
+## feedback stays visible without ever covering a dialog.
+func _build_toasts() -> void:
+	var layer: CanvasLayer = CanvasLayer.new()
+	layer.name = "ToastLayer"
+	layer.layer = TOAST_LAYER
+	add_child(layer)
+
+	_toasts = ToastUI.new()
+	layer.add_child(_toasts)
+	_toasts.set_ui_theme(_ui_theme)
 
 
 func _build_fps_overlay() -> void:
@@ -245,6 +335,30 @@ func _apply_show_fps(show_fps: bool) -> void:
 			_fps_label.text = "%d FPS" % Engine.get_frames_per_second()
 
 
+# --- Window routing --------------------------------------------------------
+
+## Mirrors the authoritative window states into the menu bar and the settings
+## overlay. Called once at boot, after the chrome and the overlays exist.
+func _sync_window_chrome() -> void:
+	for window_id: StringName in WindowRegistry.get_window_ids():
+		_on_window_visibility_changed(window_id, WindowManager.is_open(window_id))
+
+
+func _on_menu_window_pressed(window_id: StringName) -> void:
+	WindowManager.toggle_window(window_id)
+
+
+## Every window is routed through `WindowManager`, so a keyboard shortcut, a
+## menu-bar press and a close button all take the exact same path.
+func _on_window_visibility_changed(window_id: StringName, is_open: bool) -> void:
+	if _menu_bar != null:
+		_menu_bar.set_open(window_id, is_open)
+	# Settings is the one entry that is not a floating panel: it opens the
+	# existing modal overlay instead, which already owns its own layout.
+	if window_id == WindowRegistry.SETTINGS_ID and _settings_menu != null:
+		_settings_menu.set_shown(is_open)
+
+
 func _on_settings_changed(settings: Dictionary) -> void:
 	# Regenerate the theme so the high-contrast option takes effect immediately.
 	var high_contrast: bool = bool(settings.get("high_contrast", false))
@@ -252,6 +366,12 @@ func _on_settings_changed(settings: Dictionary) -> void:
 	if _hud_theme_root != null:
 		_hud_theme_root.theme = _ui_theme
 	_update_ambient_bounds()
+	if _window_host != null:
+		_window_host.set_ui_theme(_ui_theme)
+	if _menu_bar != null:
+		_menu_bar.set_ui_theme(_ui_theme)
+	if _toasts != null:
+		_toasts.set_ui_theme(_ui_theme)
 	if _pause_menu != null:
 		_pause_menu.set_ui_theme(_ui_theme)
 	if _settings_menu != null:
@@ -281,11 +401,11 @@ func _on_save_requested() -> void:
 func _on_settings_requested() -> void:
 	if _pause_menu != null:
 		_pause_menu.set_status("")
-	if _settings_menu != null:
-		_settings_menu.set_shown(true)
+	WindowManager.set_open(WindowRegistry.SETTINGS_ID, true)
 
 
 func _on_settings_closed() -> void:
+	WindowManager.set_open(WindowRegistry.SETTINGS_ID, false)
 	# Returning from settings inside gameplay should surface the pause menu again.
 	if get_tree().paused and _pause_menu != null:
 		_pause_menu.set_paused(true)
@@ -308,121 +428,7 @@ func _on_quit_requested() -> void:
 	get_tree().quit()
 
 
-func _build_hud_root() -> void:
-	var ui_layer: CanvasLayer = CanvasLayer.new()
-	ui_layer.name = "HUDRoot"
-	ui_layer.layer = UI_LAYER
-	add_child(ui_layer)
-
-	var root_margin: MarginContainer = MarginContainer.new()
-	root_margin.name = "HUDRootMargin"
-	root_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root_margin.add_theme_constant_override("margin_left", SCREEN_MARGIN)
-	root_margin.add_theme_constant_override("margin_top", SCREEN_MARGIN)
-	root_margin.add_theme_constant_override("margin_right", SCREEN_MARGIN)
-	root_margin.add_theme_constant_override("margin_bottom", SCREEN_MARGIN)
-	root_margin.theme = _ui_theme
-	ui_layer.add_child(root_margin)
-	_hud_theme_root = root_margin
-
-	var root_box: VBoxContainer = VBoxContainer.new()
-	root_box.name = "HUDRootBox"
-	root_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root_box.add_theme_constant_override("separation", PANEL_GAP)
-	root_margin.add_child(root_box)
-
-	_tabs = TabContainer.new()
-	_tabs.name = "HUDTabs"
-	_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tabs.clip_contents = true
-	root_box.add_child(_tabs)
-
-	_build_overview_tab()
-	_build_quests_tab()
-	_build_upgrades_tab()
-	_build_equipment_tab()
-	_build_inventory_tab()
-
-
-func _build_overview_tab() -> void:
-	var overview_screen: Control = Control.new()
-	overview_screen.name = "Overview"
-	overview_screen.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	overview_screen.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tabs.add_child(overview_screen)
-
-	_overview_wide_row = HBoxContainer.new()
-	_overview_wide_row.name = "WideLayout"
-	_overview_wide_row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_overview_wide_row.add_theme_constant_override("separation", PANEL_GAP)
-	overview_screen.add_child(_overview_wide_row)
-
-	_overview_wide_zone_host = VBoxContainer.new()
-	_overview_wide_zone_host.name = "ZoneHost"
-	_overview_wide_zone_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_overview_wide_zone_host.add_theme_constant_override("separation", PANEL_GAP)
-	_overview_wide_row.add_child(_overview_wide_zone_host)
-
-	_overview_wide_sidebar = VBoxContainer.new()
-	_overview_wide_sidebar.name = "Sidebar"
-	_overview_wide_sidebar.add_theme_constant_override("separation", PANEL_GAP)
-	_overview_wide_row.add_child(_overview_wide_sidebar)
-
-	_overview_narrow_column = VBoxContainer.new()
-	_overview_narrow_column.name = "NarrowLayout"
-	_overview_narrow_column.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_overview_narrow_column.add_theme_constant_override("separation", PANEL_GAP)
-	overview_screen.add_child(_overview_narrow_column)
-
-
-func _build_quests_tab() -> void:
-	# A MarginContainer tab keeps the tab's title ("Quests") independent of the
-	# mounted panel's own node name while still stretching the panel to fill.
-	_quests_host = MarginContainer.new()
-	_quests_host.name = "Quests"
-	_tabs.add_child(_quests_host)
-
-
-func _build_upgrades_tab() -> void:
-	_upgrades_host = MarginContainer.new()
-	_upgrades_host.name = "Upgrades"
-	_tabs.add_child(_upgrades_host)
-
-
-func _build_equipment_tab() -> void:
-	_equipment_host = CenterContainer.new()
-	_equipment_host.name = "Equipment"
-	_equipment_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_equipment_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tabs.add_child(_equipment_host)
-
-
-func _build_inventory_tab() -> void:
-	_inventory_host = CenterContainer.new()
-	_inventory_host.name = "Inventory"
-	_inventory_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inventory_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tabs.add_child(_inventory_host)
-
-
-func _instantiate_panels() -> void:
-	_hud_panel = _instantiate_panel(HUD_SCENE)
-	_zone_panel = _instantiate_panel(ZONE_SCENE)
-	_stats_panel = _instantiate_panel(STATS_SCENE)
-	_quest_panel = _instantiate_panel(QUEST_SCENE)
-	_upgrade_panel = _instantiate_panel(UPGRADE_SCENE)
-	_equipment_panel = _instantiate_panel(EQUIPMENT_SCENE)
-	_inventory_panel = _instantiate_panel(INVENTORY_SCENE)
-
-
-func _assign_static_panels() -> void:
-	_place_panel(_quest_panel, _quests_host)
-	_place_panel(_upgrade_panel, _upgrades_host)
-	_place_panel(_equipment_panel, _equipment_host)
-	_place_panel(_inventory_panel, _inventory_host)
-
+# --- Helpers ---------------------------------------------------------------
 
 func _instantiate_panel(scene_path: String) -> Control:
 	if not ResourceLoader.exists(scene_path):
@@ -447,45 +453,4 @@ func _instantiate_panel(scene_path: String) -> Control:
 
 
 func _on_viewport_resized() -> void:
-	_refresh_overview_layout()
 	_update_ambient_bounds()
-
-
-func _refresh_overview_layout() -> void:
-	if _tabs == null:
-		return
-
-	var viewport: Viewport = get_viewport()
-	if viewport == null:
-		return
-
-	var available_size: Vector2 = viewport.get_visible_rect().size - Vector2(float(SCREEN_MARGIN * 2), float(SCREEN_MARGIN * 2))
-	var use_wide_layout: bool = (
-		available_size.x >= WIDE_LAYOUT_MIN_WIDTH
-		and available_size.y >= WIDE_LAYOUT_MIN_HEIGHT
-		and available_size.x > available_size.y
-	)
-
-	_overview_wide_row.visible = use_wide_layout
-	_overview_narrow_column.visible = not use_wide_layout
-
-	if use_wide_layout:
-		_place_panel(_zone_panel, _overview_wide_zone_host)
-		_place_panel(_hud_panel, _overview_wide_sidebar)
-		_place_panel(_stats_panel, _overview_wide_sidebar)
-	else:
-		_place_panel(_hud_panel, _overview_narrow_column)
-		_place_panel(_stats_panel, _overview_narrow_column)
-		_place_panel(_zone_panel, _overview_narrow_column)
-
-
-func _place_panel(panel: Control, target: Node) -> void:
-	if panel == null or target == null:
-		return
-	if panel.get_parent() == target:
-		return
-
-	var current_parent: Node = panel.get_parent()
-	if current_parent != null:
-		current_parent.remove_child(panel)
-	target.add_child(panel)

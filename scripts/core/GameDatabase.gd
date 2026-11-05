@@ -103,6 +103,7 @@ func serialize_item(item: ItemData) -> Dictionary:
 		"critical_rate_mod": item.critical_rate_mod,
 		"luck_mod": item.luck_mod,
 		"equipment_slot": int(item.equipment_slot),
+		"required_level": item.required_level,
 	}
 
 
@@ -122,6 +123,7 @@ func deserialize_item(item_id: StringName, data: Dictionary) -> ItemData:
 	item.critical_rate_mod = float(data.get("critical_rate_mod", 0.0))
 	item.luck_mod = float(data.get("luck_mod", 0.0))
 	item.equipment_slot = int(data.get("equipment_slot", ItemData.EquipmentSlot.NONE))
+	item.required_level = maxi(0, int(data.get("required_level", 0)))
 	return item
 
 
@@ -141,7 +143,8 @@ func _make_item(
 	critical_rate_mod: float,
 	luck_mod: float,
 	max_stack_size: int,
-	sell_value_copper: int
+	sell_value_copper: int,
+	required_level: int = 0
 ) -> ItemData:
 	var item: ItemData = load(ITEM_SCRIPT_PATH).new()
 	item.item_id = item_id
@@ -155,6 +158,7 @@ func _make_item(
 	item.luck_mod = luck_mod
 	item.max_stack_size = maxi(1, max_stack_size)
 	item.sell_value_copper = maxi(0, sell_value_copper)
+	item.required_level = maxi(0, required_level)
 	return item
 
 
@@ -186,25 +190,25 @@ func _register_default_items() -> void:
 	register_item(_make_item(&"rusty_dagger", "Rusty Dagger", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.COMMON, ItemData.EquipmentSlot.WEAPON, 3.0, 0.0, 0.0, 0.0, 1, 15))
 	register_item(_make_item(&"iron_sword", "Iron Sword", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.UNCOMMON, ItemData.EquipmentSlot.WEAPON, 8.0, 0.0, 0.0, 0.0, 1, 70))
 	register_item(_make_item(&"steel_axe", "Steel Axe", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.RARE, ItemData.EquipmentSlot.WEAPON, 15.0, 0.0, 0.02, 0.0, 1, 180))
-	register_item(_make_item(&"flame_blade", "Flame Blade", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.EPIC, ItemData.EquipmentSlot.WEAPON, 26.0, 0.0, 0.04, 0.0, 1, 520))
-	register_item(_make_item(&"dragonfang", "Dragonfang", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.LEGENDARY, ItemData.EquipmentSlot.WEAPON, 40.0, 0.0, 0.06, 0.0, 1, 1500))
+	register_item(_make_item(&"flame_blade", "Flame Blade", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.EPIC, ItemData.EquipmentSlot.WEAPON, 26.0, 0.0, 0.04, 0.0, 1, 520, 5))
+	register_item(_make_item(&"dragonfang", "Dragonfang", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.LEGENDARY, ItemData.EquipmentSlot.WEAPON, 40.0, 0.0, 0.06, 0.0, 1, 1500, 8))
 
 	# Off-hand.
 	register_item(_make_item(&"wooden_shield", "Wooden Shield", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.COMMON, ItemData.EquipmentSlot.OFF_HAND, 0.0, 3.0, 0.0, 0.0, 1, 18))
 	register_item(_make_item(&"iron_buckler", "Iron Buckler", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.UNCOMMON, ItemData.EquipmentSlot.OFF_HAND, 0.0, 7.0, 0.0, 0.0, 1, 65))
-	register_item(_make_item(&"aegis_shield", "Aegis Shield", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.EPIC, ItemData.EquipmentSlot.OFF_HAND, 0.0, 18.0, 0.0, 0.0, 1, 460))
+	register_item(_make_item(&"aegis_shield", "Aegis Shield", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.EPIC, ItemData.EquipmentSlot.OFF_HAND, 0.0, 18.0, 0.0, 0.0, 1, 460, 5))
 
 	# Body armor.
 	register_item(_make_item(&"cloth_tunic", "Cloth Tunic", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.COMMON, ItemData.EquipmentSlot.BODY_ARMOR, 0.0, 4.0, 0.0, 0.0, 1, 24))
 	register_item(_make_item(&"chain_mail", "Chain Mail", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.UNCOMMON, ItemData.EquipmentSlot.BODY_ARMOR, 0.0, 9.0, 0.0, 0.0, 1, 85))
 	register_item(_make_item(&"plate_armor", "Plate Armor", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.RARE, ItemData.EquipmentSlot.BODY_ARMOR, 0.0, 16.0, 0.0, 0.0, 1, 210))
-	register_item(_make_item(&"dragonscale_mail", "Dragonscale Mail", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.LEGENDARY, ItemData.EquipmentSlot.BODY_ARMOR, 0.0, 30.0, 0.0, 0.0, 1, 1400))
+	register_item(_make_item(&"dragonscale_mail", "Dragonscale Mail", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.LEGENDARY, ItemData.EquipmentSlot.BODY_ARMOR, 0.0, 30.0, 0.0, 0.0, 1, 1400, 8))
 
 	# Ring (equippable in either ring slot).
 	register_item(_make_item(&"copper_ring", "Copper Ring", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.COMMON, ItemData.EquipmentSlot.RING, 1.0, 0.0, 0.0, 1.0, 1, 20))
 	register_item(_make_item(&"silver_ring", "Silver Ring", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.UNCOMMON, ItemData.EquipmentSlot.RING, 3.0, 0.0, 0.0, 2.0, 1, 75))
 	register_item(_make_item(&"ruby_ring", "Ruby Ring", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.RARE, ItemData.EquipmentSlot.RING, 6.0, 0.0, 0.02, 0.0, 1, 190))
-	register_item(_make_item(&"signet_of_kings", "Signet of Kings", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.EPIC, ItemData.EquipmentSlot.RING, 10.0, 0.0, 0.0, 5.0, 1, 500))
+	register_item(_make_item(&"signet_of_kings", "Signet of Kings", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.EPIC, ItemData.EquipmentSlot.RING, 10.0, 0.0, 0.0, 5.0, 1, 500, 6))
 
 	# Necklace.
 	register_item(_make_item(&"simple_necklace", "Simple Necklace", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.COMMON, ItemData.EquipmentSlot.NECKLACE, 0.0, 0.0, 0.0, 1.0, 1, 20))
@@ -228,7 +232,7 @@ func _register_default_items() -> void:
 
 	# Artifact.
 	register_item(_make_item(&"cracked_orb", "Cracked Orb", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.RARE, ItemData.EquipmentSlot.ARTIFACT, 12.0, 0.0, 0.0, 6.0, 1, 260))
-	register_item(_make_item(&"eternal_heart", "Eternal Heart", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.LEGENDARY, ItemData.EquipmentSlot.ARTIFACT, 22.0, 12.0, 0.05, 10.0, 1, 2000))
+	register_item(_make_item(&"eternal_heart", "Eternal Heart", ItemData.ItemType.EQUIPMENT, ItemData.Rarity.LEGENDARY, ItemData.EquipmentSlot.ARTIFACT, 22.0, 12.0, 0.05, 10.0, 1, 2000, 10))
 
 
 # --- Zone authoring --------------------------------------------------------

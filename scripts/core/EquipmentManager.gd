@@ -64,6 +64,19 @@ const SLOT_CATEGORIES: Array[int] = [
 	ItemData.EquipmentSlot.ARTIFACT,
 ]
 
+## Outcome of an equip request. `OK` means the item may be (or was) equipped;
+## every other value names the specific reason it was rejected, so the UI can
+## explain the failure instead of silently doing nothing.
+enum EquipResult {
+	OK,
+	UNKNOWN_SLOT,
+	NO_ITEM,
+	NOT_EQUIPPABLE,
+	WRONG_SLOT,
+	LEVEL_TOO_LOW,
+	NOT_IN_INVENTORY,
+}
+
 var _equipped: Array[ItemData] = []
 
 
@@ -99,17 +112,45 @@ func get_slot_label(slot: String) -> String:
 	return SLOT_LABELS[slot_index]
 
 
-## Returns `true` when `item` may be equipped in `slot` (correct category and
-## actually equippable). Used both for equipping and for UI drop validation.
+## Returns `true` when `item` may be equipped in `slot`: the right category, an
+## actually equippable item, a character level high enough to wear it, and the
+## item being held in the inventory. Used both for equipping and for UI drop
+## validation.
 func can_equip_in(item: ItemData, slot: String) -> bool:
-	if item == null:
-		return false
-	if not ItemData.is_valid_equipment_slot(item.equipment_slot):
-		return false
+	return get_equip_result(item, slot) == EquipResult.OK
+
+
+## Returns the precise reason `equip_item()` would accept or reject `item` in
+## `slot`. The inventory check is the last one performed, so the returned reason
+## always describes the *first* thing that would stop the equip.
+func get_equip_result(item: ItemData, slot: String) -> EquipResult:
 	var slot_index: int = _slot_index(slot)
 	if slot_index == -1:
-		return false
-	return int(item.equipment_slot) == SLOT_CATEGORIES[slot_index]
+		return EquipResult.UNKNOWN_SLOT
+	if item == null:
+		return EquipResult.NO_ITEM
+	if not ItemData.is_valid_equipment_slot(item.equipment_slot):
+		return EquipResult.NOT_EQUIPPABLE
+	if int(item.equipment_slot) != SLOT_CATEGORIES[slot_index]:
+		return EquipResult.WRONG_SLOT
+	if not item.meets_level_requirement(_character_level()):
+		return EquipResult.LEVEL_TOO_LOW
+	if not is_instance_valid(InventoryManager) or not InventoryManager.has_item(item):
+		return EquipResult.NOT_IN_INVENTORY
+	return EquipResult.OK
+
+
+## The reason equipping `item` into the first slot that accepts it would fail, or
+## `OK` when `auto_equip()` would succeed.
+func get_auto_equip_result(item: ItemData) -> EquipResult:
+	if item == null:
+		return EquipResult.NO_ITEM
+	if not ItemData.is_valid_equipment_slot(item.equipment_slot):
+		return EquipResult.NOT_EQUIPPABLE
+	var slot: String = find_slot_for_item(item)
+	if slot.is_empty():
+		return EquipResult.UNKNOWN_SLOT
+	return get_equip_result(item, slot)
 
 
 ## Finds the first slot instance that can accept `item`, preferring an empty one
@@ -141,29 +182,37 @@ func auto_equip(item: ItemData) -> String:
 ## Equips `item` into `slot`, returning `true` only on success.
 ##
 ## Fails (returning `false`) when the slot name is invalid, the item is `null`
-## or not equippable, the item's category does not match the slot, or the item is
-## not present in the player's inventory. Any item already occupying the slot is
-## unequipped and returned to the inventory first.
+## or not equippable, the item's category does not match the slot, the character
+## level is below the item's requirement, or the item is not present in the
+## player's inventory. Any item already occupying the slot is unequipped and
+## returned to the inventory first.
 func equip_item(item: ItemData, slot: String) -> bool:
 	var slot_index: int = _slot_index(slot)
-	if slot_index == -1:
-		push_warning("EquipmentManager: '%s' is not a valid equipment slot." % slot)
-		return false
-	if item == null:
-		push_warning("EquipmentManager: cannot equip a null item.")
-		return false
-	if not ItemData.is_valid_equipment_slot(item.equipment_slot):
-		push_warning("EquipmentManager: item '%s' is not equippable." % item.item_name)
-		return false
-	if int(item.equipment_slot) != SLOT_CATEGORIES[slot_index]:
-		push_warning(
-			"EquipmentManager: item '%s' cannot be equipped in the '%s' slot."
-			% [item.item_name, slot]
-		)
-		return false
-	if not is_instance_valid(InventoryManager) or not InventoryManager.has_item(item):
-		push_warning("EquipmentManager: item '%s' is not in the inventory." % item.item_name)
-		return false
+	match get_equip_result(item, slot):
+		EquipResult.UNKNOWN_SLOT:
+			push_warning("EquipmentManager: '%s' is not a valid equipment slot." % slot)
+			return false
+		EquipResult.NO_ITEM:
+			push_warning("EquipmentManager: cannot equip a null item.")
+			return false
+		EquipResult.NOT_EQUIPPABLE:
+			push_warning("EquipmentManager: item '%s' is not equippable." % item.item_name)
+			return false
+		EquipResult.WRONG_SLOT:
+			push_warning(
+				"EquipmentManager: item '%s' cannot be equipped in the '%s' slot."
+				% [item.item_name, slot]
+			)
+			return false
+		EquipResult.LEVEL_TOO_LOW:
+			push_warning(
+				"EquipmentManager: item '%s' requires level %d, but the character is level %d."
+				% [item.item_name, item.required_level, _character_level()]
+			)
+			return false
+		EquipResult.NOT_IN_INVENTORY:
+			push_warning("EquipmentManager: item '%s' is not in the inventory." % item.item_name)
+			return false
 
 	# Remove the incoming item first so that a freed slot is guaranteed to exist
 	# for any item displaced from the target slot, even when the inventory is
@@ -248,3 +297,11 @@ func load_state(data: Dictionary) -> void:
 ## a valid equipment slot.
 func _slot_index(slot: String) -> int:
 	return SLOT_NAMES.find(slot)
+
+
+## Current character level, used for item level requirements. Falls back to
+## level 1 so the check stays meaningful if progression is unavailable.
+func _character_level() -> int:
+	if not is_instance_valid(ProgressionManager):
+		return 1
+	return ProgressionManager.get_level()

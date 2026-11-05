@@ -236,10 +236,19 @@ func _test_overlay_menus() -> void:
 	_assert(_find_button(pause_menu, "Quit to Desktop") != null, "the pause menu has a Quit button")
 
 	var settings_tabs: TabContainer = _find_tab_container(settings_menu)
-	_assert(settings_tabs != null and settings_tabs.get_tab_count() == 3, "the settings menu has three tabs")
+	_assert(settings_tabs != null and settings_tabs.get_tab_count() == 4, "the settings menu has four tabs")
 	_assert(_find_check_button(settings_menu, "V-Sync") != null, "the graphics tab exposes V-Sync")
 	_assert(_find_check_button(settings_menu, "High Contrast") != null, "the accessibility tab exposes High Contrast")
 	_assert(_find_button(settings_menu, "Back") != null, "the settings menu can be closed")
+
+	# The keybindings tab lists one rebind button per authored window and offers
+	# a reset, so every window shortcut is editable from the settings menu.
+	var missing_binds: int = 0
+	for window_id: StringName in WindowRegistry.get_window_ids():
+		if _find_named_node(settings_menu, "Bind_%s" % window_id) == null:
+			missing_binds += 1
+	_assert(missing_binds == 0, "the keybindings tab lists every window shortcut")
+	_assert(_find_button(settings_menu, "Reset Keybindings") != null, "the keybindings tab can reset to defaults")
 
 	var credits_closed: Array[bool] = [false]
 	credits.closed.connect(func() -> void: credits_closed[0] = true)
@@ -273,6 +282,15 @@ func _test_main_integration() -> void:
 
 	var hud_margin: MarginContainer = main.get_node_or_null("HUDRoot/HUDRootMargin") as MarginContainer
 	_assert(hud_margin != null and hud_margin.theme != null, "the shared theme is applied to the HUD")
+
+	# The redesigned chrome hosts the persistent menu bar and the floating window
+	# layer that replaces the old tabbed HUD.
+	var menu_bar: MenuBarUI = main.get_node_or_null("HUDRoot/HUDRootMargin/HUDRootBox/MenuBar") as MenuBarUI
+	var window_host: WindowHostUI = main.get_node_or_null("HUDRoot/HUDRootMargin/HUDRootBox/WindowHost") as WindowHostUI
+	_assert(menu_bar != null, "the persistent menu bar is mounted")
+	_assert(window_host != null, "the floating window host is mounted")
+	if window_host != null:
+		_assert(window_host.get_game_window(WindowRegistry.CHARACTER_ID) != null, "the unified character window is mounted")
 
 	var pause_menu: CanvasLayer = main.get_node_or_null("PauseMenu") as CanvasLayer
 	_assert(pause_menu != null and not pause_menu.visible, "the game starts unpaused")
@@ -413,6 +431,13 @@ func _find_button(root_node: Node, button_text: String) -> Button:
 		var button: Button = node as Button
 		if button != null and button.text == button_text:
 			return button
+	return null
+
+
+func _find_named_node(root_node: Node, node_name: String) -> Node:
+	for node: Node in _collect_nodes(root_node):
+		if node.name == node_name:
+			return node
 	return null
 
 
