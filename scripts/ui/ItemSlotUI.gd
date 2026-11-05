@@ -8,21 +8,18 @@ extends Panel
 
 const SLOT_ICON_MARGIN: float = 4.0
 
-## Placeholder shown whenever an item has no `item_icon` assigned (for example
-## items generated at runtime such as the default 'Rusty Dagger' loot).
-## `icon.svg` imports as a `CompressedTexture2D`, which is a `Texture2D`, so it
-## is safe to assign directly to any slot's `TextureRect.texture`.
-const DEFAULT_ITEM_ICON: Texture2D = preload("res://icon.svg")
-
 ## Item currently displayed by this slot (`null` when the slot is empty).
 var item: ItemData = null
 
 
-## Returns the item's own icon, or the shared placeholder when none is assigned.
+## Returns the item's own icon, or a generated rarity-tinted gem when none is
+## assigned (for example items generated at runtime such as the default
+## 'Rusty Dagger' loot). The generated icon is a plain `Texture2D`, so it is
+## safe to assign directly to any slot's `TextureRect.texture`.
 func resolve_item_icon(source_item: ItemData) -> Texture2D:
 	if source_item.item_icon != null:
 		return source_item.item_icon
-	return DEFAULT_ITEM_ICON
+	return GameTheme.build_item_icon(source_item.rarity)
 
 
 ## Builds the multi-line metadata tooltip shown when hovering an occupied slot.

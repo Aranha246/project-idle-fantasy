@@ -59,18 +59,28 @@ func set_active_zone(zone: Resource) -> void:
 
 
 func _initialize_default_zone() -> void:
-	# Create a dummy starting zone if none exists
-	var starter_zone = load("res://scripts/resources/ZoneData.gd").new()
-	starter_zone.zone_name = "Whispering Woods"
-	starter_zone.tier_level = 1
-	
-	var slime = load("res://scripts/resources/EnemyData.gd").new()
-	slime.enemy_name = "Green Slime"
-	slime.base_health = 50
-	slime.spawn_weight = 10.0
-	
-	starter_zone.monster_pool = [slime]
+	var starter_zone: Resource = GameDatabase.get_default_zone()
+	if starter_zone == null:
+		push_error("IdleQuestManager: no default zone is registered in GameDatabase.")
+		return
 	set_active_zone(starter_zone)
+
+
+## Returns the id of the active zone, or an empty name when none is active.
+func get_active_zone_id() -> StringName:
+	if current_active_zone == null:
+		return &""
+	return current_active_zone.zone_id
+
+
+## Activates a zone by its registry id. Returns `false` when the id is unknown,
+## so callers can fall back to the current zone instead of clearing it.
+func set_active_zone_by_id(zone_id: StringName) -> bool:
+	var zone: Resource = GameDatabase.get_zone(zone_id)
+	if zone == null:
+		return false
+	set_active_zone(zone)
+	return true
 
 
 func _on_stats_updated(stats: Dictionary) -> void:

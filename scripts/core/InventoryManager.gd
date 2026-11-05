@@ -156,3 +156,48 @@ func remove_item(item: ItemData, quantity: int = 1) -> bool:
 	SignalBus.inventory_updated.emit()
 	return remaining_to_remove == 0
 
+
+## Serializes the occupied slots, preserving their grid positions so a restored
+## inventory looks exactly as the player left it.
+func get_state() -> Array:
+	var entries: Array = []
+	for i: int in _slots.size():
+		var slot: InventorySlot = _slots[i]
+		if slot.is_empty():
+			continue
+		entries.append({
+			"index": i,
+			"item_id": String(slot.item.item_id),
+			"count": slot.stack_count,
+		})
+	return entries
+
+
+## Restores the inventory from a save file. Unknown item ids are skipped with a
+## warning instead of aborting the whole load.
+func load_state(entries: Array) -> void:
+	for i: int in _slots.size():
+		_slots[i] = InventorySlot.new()
+
+	for entry: Variant in entries:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var data: Dictionary = entry
+		var index: int = int(data.get("index", -1))
+		if index < 0 or index >= _slots.size():
+			continue
+
+		var item_id: StringName = StringName(str(data.get("item_id", "")))
+		var count: int = int(data.get("count", 0))
+		if item_id == &"" or count <= 0:
+			continue
+
+		var item: ItemData = GameDatabase.get_item(item_id)
+		if item == null:
+			push_warning("InventoryManager: unknown item '%s' in save; skipped." % item_id)
+			continue
+
+		_slots[index] = InventorySlot.new(item, mini(count, item.max_stack_size))
+
+	SignalBus.inventory_updated.emit()
+

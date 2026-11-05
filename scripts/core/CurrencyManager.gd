@@ -36,3 +36,17 @@ func _normalize_tiers() -> void:
 
 func _on_enemy_defeated(reward_copper: int) -> void:
 	add_copper(reward_copper)
+
+
+## Serializes the wallet for `SaveManager`.
+func get_state() -> Dictionary:
+	return {"copper": copper, "silver": silver, "gold": gold}
+
+
+## Restores the wallet from a save file, normalizing tiers and broadcasting.
+func load_state(data: Dictionary) -> void:
+	copper = maxi(0, int(data.get("copper", 0)))
+	silver = maxi(0, int(data.get("silver", 0)))
+	gold = maxi(0, int(data.get("gold", 0)))
+	_normalize_tiers()
+	SignalBus.currency_updated.emit(copper, silver, gold)

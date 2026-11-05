@@ -2,6 +2,8 @@ class_name ZoneData
 extends Resource
 ## Data definition for a gameplay zone with specific tiers and monster pools.
 
+## Stable identifier used to persist and restore the active zone.
+@export var zone_id: StringName = &""
 @export var zone_name: String = "New Zone"
 @export var tier_level: int = 1:
 	set(value):

@@ -49,3 +49,25 @@ signal enemy_health_updated(current_health: int, max_health: int)
 
 ## Emitted when a quest (combat tick) is completed with rewards.
 signal quest_completed(rewards: Dictionary)
+
+## Emitted whenever a player setting changes and has been applied.
+## `settings` is a snapshot dictionary (see `SettingsManager.get_snapshot()`).
+signal settings_changed(settings: Dictionary)
+
+## Emitted after the game state has been written to disk.
+signal game_saved(path: String)
+
+## Emitted after the game state has been restored from disk.
+signal game_loaded(path: String)
+
+## Emitted when the player gains experience points.
+signal xp_gained(amount: int, current_xp: int, xp_to_next: int)
+
+## Emitted when the player reaches a new character level.
+signal level_up(new_level: int)
+
+## Emitted when the pause state toggles. `paused` is the new state.
+signal pause_toggled(paused: bool)
+
+## Emitted when the credits sequence has finished playing.
+signal credits_finished()

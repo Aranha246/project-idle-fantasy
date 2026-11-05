@@ -29,7 +29,7 @@ func _ready() -> void:
 
 func _build_ui() -> void:
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 8)
 	add_child(vbox)
 	
 	var header := Label.new()

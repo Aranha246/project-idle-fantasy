@@ -19,18 +19,17 @@ corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 [node name="ZoneSelectionUI" type="PanelContainer"]
-custom_minimum_size = Vector2(360, 288)
+custom_minimum_size = Vector2(320, 0)
 size_flags_horizontal = 3
 size_flags_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_zone")
 script = ExtResource("1_zone")
 
-[node name="Layout" type="HBoxContainer" parent="."]
+[node name="Layout" type="VBoxContainer" parent="."]
 layout_mode = 2
 theme_override_constants/separation = 12
 
 [node name="Selector" type="VBoxContainer" parent="Layout"]
-custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
 
 [node name="Label" type="Label" parent="Layout/Selector"]
@@ -38,12 +37,7 @@ layout_mode = 2
 text = "Zones"
 horizontal_alignment = 1
 
-[node name="Scroll" type="ScrollContainer" parent="Layout/Selector"]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-
-[node name="ZoneList" type="VBoxContainer" parent="Layout/Selector/Scroll"]
+[node name="ZoneList" type="VBoxContainer" parent="Layout/Selector"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -64,8 +58,9 @@ text = "Active Zone"
 
 [node name="BackgroundRect" type="TextureRect" parent="Layout/Details"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
+size_flags_vertical = 3
 expand_mode = 1
 stretch_mode = 6
 

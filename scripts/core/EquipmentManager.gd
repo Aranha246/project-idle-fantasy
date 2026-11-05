@@ -104,6 +104,38 @@ func get_slots() -> Array[ItemData]:
 	return _equipped.duplicate()
 
 
+## Serializes the equipped items as a slot name -> item id map. Empty slots map
+## to an empty string.
+func get_state() -> Dictionary:
+	var state: Dictionary = {}
+	for i: int in SLOT_NAMES.size():
+		var item: ItemData = _equipped[i]
+		state[SLOT_NAMES[i]] = String(item.item_id) if item != null else ""
+	return state
+
+
+## Restores equipment directly from a save file.
+##
+## Unlike `equip_item()`, this deliberately bypasses the inventory checks: a
+## loaded item is already equipped, so it is not expected to be in the bag.
+func load_state(data: Dictionary) -> void:
+	for i: int in SLOT_NAMES.size():
+		var slot_name: String = SLOT_NAMES[i]
+		var item_id: StringName = StringName(str(data.get(slot_name, "")))
+
+		var item: ItemData = null
+		if item_id != &"":
+			item = GameDatabase.get_item(item_id)
+			if item == null:
+				push_warning(
+					"EquipmentManager: unknown item '%s' in save; clearing slot '%s'."
+					% [item_id, slot_name]
+				)
+
+		_equipped[i] = item
+		SignalBus.equipment_updated.emit(slot_name, item)
+
+
 ## Returns the index of `slot` within `SLOT_NAMES`, or `-1` when the name is not
 ## a valid equipment slot.
 func _slot_index(slot: String) -> int:

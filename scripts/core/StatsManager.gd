@@ -62,6 +62,26 @@ func get_all_stats() -> Dictionary:
 	}
 
 
+## Serializes only the base attributes; equipment bonuses are derived from the
+## equipped items, which `SaveManager` persists separately.
+func get_base_stats() -> Dictionary:
+	return {
+		"attack_power": _base_attack_power,
+		"defense": _base_defense,
+		"critical_rate": _base_critical_rate,
+		"luck": _base_luck
+	}
+
+
+## Restores the base attributes from a save file and recalculates immediately.
+func set_base_stats(data: Dictionary) -> void:
+	_base_attack_power = maxf(0.0, float(data.get("attack_power", _base_attack_power)))
+	_base_defense = maxf(0.0, float(data.get("defense", _base_defense)))
+	_base_critical_rate = clampf(float(data.get("critical_rate", _base_critical_rate)), 0.0, 1.0)
+	_base_luck = maxf(0.0, float(data.get("luck", _base_luck)))
+	_recalculate_stats()
+
+
 func _on_equipment_changed(_slot: String, _item: ItemData) -> void:
 	# Debounce recalculation
 	_recalc_timer.start()

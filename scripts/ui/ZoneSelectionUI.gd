@@ -24,24 +24,9 @@ func _ready() -> void:
 
 
 func _load_zones() -> void:
-	# Mock data for demonstration
-	var z1 = load("res://scripts/resources/ZoneData.gd").new()
-	z1.zone_name = "Whispering Woods"
-	z1.tier_level = 1
-	var e1 = load("res://scripts/resources/EnemyData.gd").new()
-	e1.enemy_name = "Green Slime"
-	e1.base_health = 50
-	z1.monster_pool = [e1]
-	
-	var z2 = load("res://scripts/resources/ZoneData.gd").new()
-	z2.zone_name = "Shadow Cave"
-	z2.tier_level = 2
-	var e2 = load("res://scripts/resources/EnemyData.gd").new()
-	e2.enemy_name = "Shadow Bat"
-	e2.base_health = 120
-	z2.monster_pool = [e2]
-	
-	_available_zones = [z1, z2]
+	# The zone catalogue lives in GameDatabase so this UI, the idle quest
+	# manager and the save system all agree on the same set of zones.
+	_available_zones = GameDatabase.get_all_zones()
 
 
 func _build_zone_list() -> void:

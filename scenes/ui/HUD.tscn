@@ -19,7 +19,7 @@ corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 [node name="HUD" type="PanelContainer"]
-custom_minimum_size = Vector2(200, 0)
+custom_minimum_size = Vector2(220, 0)
 size_flags_horizontal = 0
 size_flags_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_hud")
@@ -29,35 +29,56 @@ script = ExtResource("1_hud")
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="CopperLabel" type="Label" parent="CurrencyBox"]
+[node name="LevelLabel" type="Label" parent="CurrencyBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 36)
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.623529, 0.482353, 0.921569, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 15
+text = "Level 1  -  0/0 XP"
+vertical_alignment = 1
+
+[node name="XPBar" type="ProgressBar" parent="CurrencyBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+show_percentage = false
+
+[node name="CurrencyRow" type="HBoxContainer" parent="CurrencyBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CopperLabel" type="Label" parent="CurrencyBox/CurrencyRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.858824, 0.552941, 0.247059, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
 theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 text = "0 CP"
 vertical_alignment = 1
 
-[node name="SilverLabel" type="Label" parent="CurrencyBox"]
+[node name="SilverLabel" type="Label" parent="CurrencyBox/CurrencyRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.823529, 0.839216, 0.870588, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
 theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 text = "0 SP"
 vertical_alignment = 1
 
-[node name="GoldLabel" type="Label" parent="CurrencyBox"]
+[node name="GoldLabel" type="Label" parent="CurrencyBox/CurrencyRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.843137, 0.25098, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.784314)
 theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 24
 text = "0 GP"
 vertical_alignment = 1
