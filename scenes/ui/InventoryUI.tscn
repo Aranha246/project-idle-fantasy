@@ -19,14 +19,9 @@ corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 [node name="InventoryUI" type="PanelContainer"]
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -320.0
-offset_top = 24.0
-offset_right = -24.0
-offset_bottom = 300.0
-grow_horizontal = 0
+custom_minimum_size = Vector2(296, 0)
+size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 script = ExtResource("1_inv")
 

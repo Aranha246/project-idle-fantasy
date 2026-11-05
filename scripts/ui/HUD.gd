@@ -1,9 +1,10 @@
-extends CanvasLayer
+extends PanelContainer
 ## Heads-up display for the player's tiered currency.
 ##
-## The root node is a CanvasLayer, so the HUD renders above the game world
-## and stays fixed on screen regardless of the active Camera2D. It listens to
-## the global `SignalBus.currency_updated` signal to refresh the labels.
+## The root node is a `PanelContainer` so the panel is laid out by the HUD's
+## shared container row in `Main.gd` (which owns the screen-fixed CanvasLayer),
+## guaranteeing it never overlaps the neighbouring panels. It listens to the
+## global `SignalBus.currency_updated` signal to refresh the labels.
 
 @onready var copper_label: Label = %CopperLabel
 @onready var silver_label: Label = %SilverLabel

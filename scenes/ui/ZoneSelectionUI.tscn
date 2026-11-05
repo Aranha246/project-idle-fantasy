@@ -19,11 +19,9 @@ corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 [node name="ZoneSelectionUI" type="PanelContainer"]
-anchors_preset = 0
-offset_left = 24.0
-offset_top = 24.0
-offset_right = 424.0
-offset_bottom = 424.0
+custom_minimum_size = Vector2(360, 288)
+size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_zone")
 script = ExtResource("1_zone")
 
