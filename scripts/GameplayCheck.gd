@@ -652,6 +652,26 @@ func _test_window_system() -> void:
 	)
 	_assert(FileAccess.file_exists(SettingsManager.SETTINGS_PATH), "the window layout is written to the settings file")
 
+	# --- a layout that hides every window is repaired -----------------------
+	# Every window can be closed by hand, and closing the Character window is
+	# enough to reach that state because it is the only one open out of the box.
+	# Restoring it verbatim would boot the game onto an empty work area that
+	# looks exactly like the interface failing to render, so the boot path has
+	# to refuse it.
+	for window_id: StringName in WindowRegistry.get_window_ids():
+		WindowManager.set_open(window_id, false)
+	_assert(WindowManager.get_open_window_ids().is_empty(), "every window can be closed by hand")
+	SettingsManager.load_settings()
+	WindowManager.sync_from_settings()
+	_assert(
+		WindowManager.is_open(WindowRegistry.CHARACTER_ID),
+		"booting from an all-closed layout reopens the authored default window"
+	)
+	_assert(
+		SettingsManager.get_window_layout(WindowRegistry.QUESTS_ID).get("position", Vector2.ZERO) == Vector2(210.0, 130.0),
+		"repairing an all-closed layout leaves the other windows untouched"
+	)
+
 	# Leave the authored defaults in place for the remaining suites.
 	WindowManager.reset_to_defaults()
 	SettingsManager.reset_to_defaults()

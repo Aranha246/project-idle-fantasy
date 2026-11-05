@@ -30,6 +30,23 @@ func sync_from_settings() -> void:
 	for definition: WindowData in WindowRegistry.get_definitions():
 		var layout: Dictionary = SettingsManager.get_window_layout(definition.window_id)
 		set_open(definition.window_id, bool(layout.get("open", definition.open_by_default)))
+	_ensure_a_window_is_open()
+
+
+## Reopens the authored default windows when a restored layout hides all of them.
+##
+## With every window closed the interface collapses to a bare menu bar over an
+## empty work area, which is indistinguishable from the game failing to render
+## its panels. That state is easy to reach by accident because the Character
+## window is the only one open out of the box, so it must never survive a boot.
+## Only the windows that opted into opening by default are reopened; every
+## dragged position and size is left exactly as it was.
+func _ensure_a_window_is_open() -> void:
+	if not get_open_window_ids().is_empty():
+		return
+	for definition: WindowData in WindowRegistry.get_definitions():
+		if definition.open_by_default:
+			set_open(definition.window_id, true)
 
 
 func _unhandled_input(event: InputEvent) -> void:
