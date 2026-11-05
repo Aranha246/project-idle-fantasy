@@ -25,7 +25,8 @@ CurrencyManager="*res://scripts/core/CurrencyManager.gd"
 ProgressionManager="*res://scripts/core/ProgressionManager.gd"
 InventoryManager="*res://scripts/core/InventoryManager.gd"
 EquipmentManager="*res://scripts/core/EquipmentManager.gd"
-IdleQuestManager="*res://scripts/core/IdleQuestManager.gd"
+UpgradeManager="*res://scripts/core/UpgradeManager.gd"
+QuestManager="*res://scripts/core/QuestManager.gd"
 SaveManager="*res://scripts/core/SaveManager.gd"
 
 [display]

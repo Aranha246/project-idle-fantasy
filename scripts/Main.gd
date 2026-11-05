@@ -2,9 +2,11 @@ extends Node2D
 ## Root scene controller.
 ##
 ## The HUD no longer uses any scrolling containers. Instead, the interface is
-## split into three responsive tabs:
+## split into five responsive tabs:
 ##
 ## - Overview: currency, zone selection, and character stats
+## - Quests: the player-driven quest board (with the animated hero)
+## - Upgrades: the currency upgrade shop
 ## - Equipment: equipment management
 ## - Inventory: inventory management
 ##
@@ -36,6 +38,8 @@ const FPS_LABEL_FONT_SIZE: int = 13
 const HUD_SCENE: String = "res://scenes/ui/HUD.tscn"
 const ZONE_SCENE: String = "res://scenes/ui/ZoneSelectionUI.tscn"
 const STATS_SCENE: String = "res://scenes/ui/StatsUI.tscn"
+const QUEST_SCENE: String = "res://scenes/ui/QuestUI.tscn"
+const UPGRADE_SCENE: String = "res://scenes/ui/UpgradeUI.tscn"
 const EQUIPMENT_SCENE: String = "res://scenes/ui/EquipmentUI.tscn"
 const INVENTORY_SCENE: String = "res://scenes/ui/InventoryUI.tscn"
 
@@ -44,12 +48,16 @@ var _overview_wide_row: HBoxContainer = null
 var _overview_wide_zone_host: VBoxContainer = null
 var _overview_wide_sidebar: VBoxContainer = null
 var _overview_narrow_column: VBoxContainer = null
+var _quests_host: MarginContainer = null
+var _upgrades_host: MarginContainer = null
 var _equipment_host: CenterContainer = null
 var _inventory_host: CenterContainer = null
 
 var _hud_panel: Control = null
 var _zone_panel: Control = null
 var _stats_panel: Control = null
+var _quest_panel: Control = null
+var _upgrade_panel: Control = null
 var _equipment_panel: Control = null
 var _inventory_panel: Control = null
 
@@ -332,6 +340,8 @@ func _build_hud_root() -> void:
 	root_box.add_child(_tabs)
 
 	_build_overview_tab()
+	_build_quests_tab()
+	_build_upgrades_tab()
 	_build_equipment_tab()
 	_build_inventory_tab()
 
@@ -367,6 +377,20 @@ func _build_overview_tab() -> void:
 	overview_screen.add_child(_overview_narrow_column)
 
 
+func _build_quests_tab() -> void:
+	# A MarginContainer tab keeps the tab's title ("Quests") independent of the
+	# mounted panel's own node name while still stretching the panel to fill.
+	_quests_host = MarginContainer.new()
+	_quests_host.name = "Quests"
+	_tabs.add_child(_quests_host)
+
+
+func _build_upgrades_tab() -> void:
+	_upgrades_host = MarginContainer.new()
+	_upgrades_host.name = "Upgrades"
+	_tabs.add_child(_upgrades_host)
+
+
 func _build_equipment_tab() -> void:
 	_equipment_host = CenterContainer.new()
 	_equipment_host.name = "Equipment"
@@ -387,11 +411,15 @@ func _instantiate_panels() -> void:
 	_hud_panel = _instantiate_panel(HUD_SCENE)
 	_zone_panel = _instantiate_panel(ZONE_SCENE)
 	_stats_panel = _instantiate_panel(STATS_SCENE)
+	_quest_panel = _instantiate_panel(QUEST_SCENE)
+	_upgrade_panel = _instantiate_panel(UPGRADE_SCENE)
 	_equipment_panel = _instantiate_panel(EQUIPMENT_SCENE)
 	_inventory_panel = _instantiate_panel(INVENTORY_SCENE)
 
 
 func _assign_static_panels() -> void:
+	_place_panel(_quest_panel, _quests_host)
+	_place_panel(_upgrade_panel, _upgrades_host)
 	_place_panel(_equipment_panel, _equipment_host)
 	_place_panel(_inventory_panel, _inventory_host)
 

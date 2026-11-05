@@ -1,0 +1,79 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/QuestUI.gd" id="1_quest"]
+[ext_resource type="Script" path="res://scripts/ui/HeroArt.gd" id="2_hero"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_quest"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0.0901961, 0.0901961, 0.121569, 0.941176)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.301961, 0.278431, 0.352941, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="QuestUI" type="PanelContainer"]
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_quest")
+script = ExtResource("1_quest")
+
+[node name="Layout" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="Label" parent="Layout"]
+layout_mode = 2
+text = "Quest Board"
+horizontal_alignment = 1
+
+[node name="Body" type="HBoxContainer" parent="Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="HeroHolder" type="CenterContainer" parent="Layout/Body"]
+custom_minimum_size = Vector2(140, 140)
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="HeroArt" type="Control" parent="Layout/Body/HeroHolder"]
+custom_minimum_size = Vector2(140, 140)
+layout_mode = 2
+script = ExtResource("2_hero")
+
+[node name="QuestColumn" type="VBoxContainer" parent="Layout/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="QuestList" type="VBoxContainer" parent="Layout/Body/QuestColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="ActiveQuestLabel" type="Label" parent="Layout/Body/QuestColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+clip_text = true
+text = "Select a quest to begin."
+
+[node name="QuestProgressBar" type="ProgressBar" parent="Layout/Body/QuestColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+show_percentage = false
+
+[node name="QuestActionButton" type="Button" parent="Layout/Body/QuestColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Claim Reward"

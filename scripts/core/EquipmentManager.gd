@@ -1,23 +1,76 @@
 extends Node
 ## Autoload singleton that owns the player's equipped items.
 ##
-## Equipment is stored in a fixed, strongly-typed array of exactly three slots
-## (Weapon, Armor, Accessory); an empty slot is represented by `null`. This is a
-## deliberate choice over a generic Dictionary so every access is statically
-## typed. Changes are broadcast exclusively through `SignalBus.equipment_updated`,
+## Equipment is stored in a fixed, strongly-typed array of thirteen slot
+## *instances* covering every authored equipment category; an empty slot is
+## represented by `null`. Two of those instances share the `RING` category, so a
+## slot is defined by its instance name (`RING_1`, `RING_2`) while what it
+## accepts is defined by `SLOT_CATEGORIES`. This is a deliberate choice over a
+## generic Dictionary so every access is statically typed.
+##
+## Changes are broadcast exclusively through `SignalBus.equipment_updated`,
 ## keeping the UI and every other system decoupled from this manager.
 
-## Canonical slot names, ordered so the array index matches the numeric value of
-## `ItemData.EquipmentSlot`: 0 -> WEAPON, 1 -> ARMOR, 2 -> ACCESSORY.
-const SLOT_NAMES: Array[String] = ["WEAPON", "ARMOR", "ACCESSORY"]
+## Canonical slot instance names, in display order (matching the on-screen grid).
+const SLOT_NAMES: Array[String] = [
+	"HELMET",
+	"TRINKET",
+	"AMULET",
+	"WEAPON",
+	"OFF_HAND",
+	"BODY_ARMOR",
+	"RING_1",
+	"RING_2",
+	"NECKLACE",
+	"BELT",
+	"GLOVES",
+	"BOOTS",
+	"ARTIFACT",
+]
+
+## Human readable label for each slot instance, aligned with `SLOT_NAMES`.
+const SLOT_LABELS: Array[String] = [
+	"Helmet",
+	"Trinket",
+	"Amulet",
+	"Weapon",
+	"Off-Hand",
+	"Body Armor",
+	"Ring I",
+	"Ring II",
+	"Necklace",
+	"Belt",
+	"Gloves",
+	"Boots",
+	"Artifact",
+]
+
+## `ItemData.EquipmentSlot` category each slot instance accepts, aligned with
+## `SLOT_NAMES`. Both ring instances accept the single `RING` category, which is
+## exactly why a slot name can no longer be compared to a category directly.
+const SLOT_CATEGORIES: Array[int] = [
+	ItemData.EquipmentSlot.HELMET,
+	ItemData.EquipmentSlot.TRINKET,
+	ItemData.EquipmentSlot.AMULET,
+	ItemData.EquipmentSlot.WEAPON,
+	ItemData.EquipmentSlot.OFF_HAND,
+	ItemData.EquipmentSlot.BODY_ARMOR,
+	ItemData.EquipmentSlot.RING,
+	ItemData.EquipmentSlot.RING,
+	ItemData.EquipmentSlot.NECKLACE,
+	ItemData.EquipmentSlot.BELT,
+	ItemData.EquipmentSlot.GLOVES,
+	ItemData.EquipmentSlot.BOOTS,
+	ItemData.EquipmentSlot.ARTIFACT,
+]
 
 var _equipped: Array[ItemData] = []
 
 
 func _ready() -> void:
-	# All three slots start empty (`null`).
+	# Every slot starts empty (`null`).
 	_equipped.resize(SLOT_NAMES.size())
-	for i in SLOT_NAMES.size():
+	for i: int in SLOT_NAMES.size():
 		_equipped[i] = null
 
 
@@ -30,12 +83,67 @@ func get_equipped(slot: String) -> ItemData:
 	return _equipped[slot_index]
 
 
+## Returns the category a slot instance accepts, or `ItemData.EquipmentSlot.NONE`
+## when the name is invalid.
+func get_slot_category(slot: String) -> ItemData.EquipmentSlot:
+	var slot_index: int = _slot_index(slot)
+	if slot_index == -1:
+		return ItemData.EquipmentSlot.NONE
+	return SLOT_CATEGORIES[slot_index] as ItemData.EquipmentSlot
+
+
+func get_slot_label(slot: String) -> String:
+	var slot_index: int = _slot_index(slot)
+	if slot_index == -1:
+		return ""
+	return SLOT_LABELS[slot_index]
+
+
+## Returns `true` when `item` may be equipped in `slot` (correct category and
+## actually equippable). Used both for equipping and for UI drop validation.
+func can_equip_in(item: ItemData, slot: String) -> bool:
+	if item == null:
+		return false
+	if not ItemData.is_valid_equipment_slot(item.equipment_slot):
+		return false
+	var slot_index: int = _slot_index(slot)
+	if slot_index == -1:
+		return false
+	return int(item.equipment_slot) == SLOT_CATEGORIES[slot_index]
+
+
+## Finds the first slot instance that can accept `item`, preferring an empty one
+## so auto-equip never displaces an already equipped item. Returns an empty
+## string when no slot accepts the item.
+func find_slot_for_item(item: ItemData) -> String:
+	if item == null or not ItemData.is_valid_equipment_slot(item.equipment_slot):
+		return ""
+	var fallback: String = ""
+	for i: int in SLOT_NAMES.size():
+		if int(item.equipment_slot) != SLOT_CATEGORIES[i]:
+			continue
+		if _equipped[i] == null:
+			return SLOT_NAMES[i]
+		if fallback.is_empty():
+			fallback = SLOT_NAMES[i]
+	return fallback
+
+
+## Equips `item` into the first slot that accepts it. Returns the slot name used,
+## or an empty string when the item is not equippable or not in the inventory.
+func auto_equip(item: ItemData) -> String:
+	var slot: String = find_slot_for_item(item)
+	if slot.is_empty():
+		return ""
+	return slot if equip_item(item, slot) else ""
+
+
 ## Equips `item` into `slot`, returning `true` only on success.
 ##
 ## Fails (returning `false`) when the slot name is invalid, the item is `null`
-## or not equippable, the item is not allowed in the requested slot, or the item
-## is not present in the player's inventory. Any item already occupying the slot
-## is unequipped and returned to the inventory first.
+## or not equippable, the item's category does not match the slot, or the item is
+## not present in the player's inventory. Any item already occupying the slot is
+## unequipped and returned to the inventory first.
 func equip_item(item: ItemData, slot: String) -> bool:
 	var slot_index: int = _slot_index(slot)
 	if slot_index == -1:
@@ -47,7 +155,7 @@ func equip_item(item: ItemData, slot: String) -> bool:
 	if not ItemData.is_valid_equipment_slot(item.equipment_slot):
 		push_warning("EquipmentManager: item '%s' is not equippable." % item.item_name)
 		return false
-	if int(item.equipment_slot) != slot_index:
+	if int(item.equipment_slot) != SLOT_CATEGORIES[slot_index]:
 		push_warning(
 			"EquipmentManager: item '%s' cannot be equipped in the '%s' slot."
 			% [item.item_name, slot]

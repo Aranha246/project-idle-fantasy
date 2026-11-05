@@ -17,6 +17,12 @@ func _ready() -> void:
 	SignalBus.enemy_defeated.connect(_on_enemy_defeated)
 
 
+## Total wallet value expressed in Copper, so affordability can be compared
+## against a single number regardless of how the tiers are broken up.
+func get_total_copper() -> int:
+	return copper + silver * COPPER_PER_SILVER + gold * COPPER_PER_SILVER * SILVER_PER_GOLD
+
+
 ## Adds raw Copper to the wallet, then normalizes and broadcasts the result.
 func add_copper(amount: int) -> void:
 	if amount <= 0:
@@ -24,6 +30,26 @@ func add_copper(amount: int) -> void:
 	copper += amount
 	_normalize_tiers()
 	SignalBus.currency_updated.emit(copper, silver, gold)
+
+
+## Spends `amount` Copper when the wallet can afford it. Returns `true` on
+## success and `false` (leaving the wallet untouched) when the player is short,
+## which is the guard the upgrade system relies on.
+func spend_copper(amount: int) -> bool:
+	if amount <= 0:
+		return false
+	var total: int = get_total_copper()
+	if total < amount:
+		return false
+
+	var remainder: int = total - amount
+	gold = remainder / (COPPER_PER_SILVER * SILVER_PER_GOLD)
+	remainder %= COPPER_PER_SILVER * SILVER_PER_GOLD
+	silver = remainder / COPPER_PER_SILVER
+	copper = remainder % COPPER_PER_SILVER
+	_normalize_tiers()
+	SignalBus.currency_updated.emit(copper, silver, gold)
+	return true
 
 
 @warning_ignore("integer_division")

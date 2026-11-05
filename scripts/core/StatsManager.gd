@@ -26,9 +26,17 @@ func _ready() -> void:
 	add_child(_recalc_timer)
 	
 	SignalBus.equipment_updated.connect(_on_equipment_changed)
+	# Purchased upgrades also change the totals, so recalculate when one lands.
+	SignalBus.upgrade_purchased.connect(_on_upgrade_changed)
+	SignalBus.game_loaded.connect(_on_game_loaded)
 	
 	# Initial calculation
 	_recalculate_stats()
+
+
+func _on_game_loaded(_path: String) -> void:
+	# A loaded save rewrites upgrade levels without emitting a purchase.
+	_recalc_timer.start()
 
 
 func get_attack_power() -> float: return _current_attack_power
@@ -87,6 +95,17 @@ func _on_equipment_changed(_slot: String, _item: ItemData) -> void:
 	_recalc_timer.start()
 
 
+func _on_upgrade_changed(_upgrade_id: StringName, _new_level: int) -> void:
+	_recalc_timer.start()
+
+
+## Sums the flat stat bonus granted by purchased upgrades.
+func _upgrade_bonus(stat_name: String) -> float:
+	if not is_instance_valid(UpgradeManager):
+		return 0.0
+	return UpgradeManager.get_stat_bonus(stat_name)
+
+
 func _recalculate_stats() -> void:
 	var bonus_atk: float = 0.0
 	var bonus_def: float = 0.0
@@ -102,10 +121,10 @@ func _recalculate_stats() -> void:
 				bonus_crit += item.critical_rate_mod
 				bonus_luck += item.luck_mod
 	
-	_current_attack_power = _base_attack_power + bonus_atk
-	_current_defense = _base_defense + bonus_def
-	_current_critical_rate = clampf(_base_critical_rate + bonus_crit, 0.0, 1.0)
-	_current_luck = _base_luck + bonus_luck
+	_current_attack_power = _base_attack_power + bonus_atk + _upgrade_bonus("attack_power")
+	_current_defense = _base_defense + bonus_def + _upgrade_bonus("defense")
+	_current_critical_rate = clampf(_base_critical_rate + bonus_crit + _upgrade_bonus("critical_rate"), 0.0, 1.0)
+	_current_luck = _base_luck + bonus_luck + _upgrade_bonus("luck")
 	
 	SignalBus.stats_updated.emit(get_all_stats())
 	print("[StatsManager] Stats recalculated: ATK=%.1f, DEF=%.1f, CRIT=%.1f%%, LUCK=%.1f" % [

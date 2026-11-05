@@ -10,7 +10,9 @@ extends Node
 ## be triggered manually from the pause menu.
 
 const SAVE_PATH: String = "user://savegame.json"
-const SAVE_VERSION: int = 1
+
+## Bumped to 2 when purchased upgrade levels joined the save payload.
+const SAVE_VERSION: int = 2
 
 ## How often the game state is written to disk while playing.
 const AUTOSAVE_INTERVAL_SECONDS: float = 60.0
@@ -108,7 +110,8 @@ func _gather_state() -> Dictionary:
 		"currency": CurrencyManager.get_state(),
 		"base_stats": StatsManager.get_base_stats(),
 		"progression": ProgressionManager.get_state(),
-		"zone_id": String(IdleQuestManager.get_active_zone_id()),
+		"upgrades": UpgradeManager.get_state(),
+		"zone_id": String(QuestManager.get_active_zone_id()),
 		"inventory": InventoryManager.get_state(),
 		"equipment": EquipmentManager.get_state(),
 		"items": _collect_item_snapshots(),
@@ -125,10 +128,13 @@ func _apply_state(data: Dictionary) -> void:
 	CurrencyManager.load_state(data.get("currency", {}))
 	StatsManager.set_base_stats(data.get("base_stats", {}))
 	ProgressionManager.load_state(data.get("progression", {}))
+	# Upgrades feed quest pacing and stats, so restore them before the zone is
+	# re-selected (a shorter quest duration is derived on selection).
+	UpgradeManager.load_state(data.get("upgrades", {}))
 
 	var zone_id: StringName = StringName(str(data.get("zone_id", "")))
-	if zone_id != &"" and not IdleQuestManager.set_active_zone_by_id(zone_id):
-		push_warning("SaveManager: saved zone '%s' is unknown; keeping the current zone." % zone_id)
+	if zone_id != &"" and not QuestManager.set_active_zone_by_id(zone_id):
+		push_warning("SaveManager: saved zone '%s' is unknown or locked; keeping the current zone." % zone_id)
 
 
 ## Collects a definition for every item currently held or equipped, keyed by id.

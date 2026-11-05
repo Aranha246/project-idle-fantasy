@@ -5,7 +5,9 @@ extends Node
 ## represented by `null`. Changes are broadcast through
 ## `SignalBus.inventory_updated` so the UI stays fully decoupled.
 
-const MAX_CAPACITY: int = 20
+## Storage size. Expanded from 20 to comfortably hold loot from every source
+## now that drops actually happen across materials, consumables and gear.
+const MAX_CAPACITY: int = 48
 const SORT_COOLDOWN_MS: int = 1000
 
 var _slots: Array[InventorySlot] = []
@@ -113,6 +115,8 @@ func sort_inventory(force_sort: bool = false) -> void:
 func _get_type_priority(type: ItemData.ItemType) -> int:
 	match type:
 		ItemData.ItemType.CONSUMABLE: return 0
+		ItemData.ItemType.EQUIPMENT: return 1
+		# Legacy equipment types predate `EQUIPMENT`; keep them grouped with it.
 		ItemData.ItemType.WEAPON, ItemData.ItemType.ARMOR: return 1
 		ItemData.ItemType.MATERIAL: return 2
 	return 99

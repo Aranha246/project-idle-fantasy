@@ -12,7 +12,7 @@ const RESOLUTIONS: Array[Vector2i] = [
 	Vector2i(844, 390),
 	Vector2i(390, 844),
 ]
-const EXPECTED_TABS: Array[String] = ["Overview", "Equipment", "Inventory"]
+const EXPECTED_TABS: Array[String] = ["Overview", "Quests", "Upgrades", "Equipment", "Inventory"]
 
 var _failed: int = 0
 var _passed: int = 0
@@ -88,7 +88,7 @@ func _collect_scroll_containers(root_node: Node) -> Array[ScrollContainer]:
 
 func _visible_tracked_panels(main: Node) -> Array[Control]:
 	var panels: Array[Control] = []
-	for panel_name: String in ["HUD", "ZoneSelectionUI", "StatsUI", "EquipmentUI", "InventoryUI"]:
+	for panel_name: String in ["HUD", "ZoneSelectionUI", "StatsUI", "QuestUI", "UpgradeUI", "EquipmentUI", "InventoryUI"]:
 		var panel: Control = main.find_child(panel_name, true, false) as Control
 		if panel != null and panel.is_visible_in_tree():
 			panels.append(panel)

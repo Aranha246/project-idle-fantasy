@@ -2,7 +2,13 @@ extends PanelContainer
 ## Inventory panel: builds a fixed grid of item slots and refreshes it whenever
 ## the global `SignalBus.inventory_updated` signal fires.
 
-const SLOT_COUNT: int = 20
+## Preferred maximum number of columns; more than this starts to look like a
+## spreadsheet rather than an inventory. Kept high enough that the 48-slot grid
+## stays short (fewer rows) and therefore fits 844x390 without scrolling.
+const MAX_COLUMNS: int = 10
+## Never go below this many columns so the grid stays usable on tiny screens.
+const MIN_COLUMNS: int = 4
+const GRID_SEPARATION: int = 6
 
 @onready var _grid: GridContainer = %InventoryGrid
 @onready var _sort_button: Button = %SortButton
@@ -18,7 +24,29 @@ func _ready() -> void:
 	_sort_button.pressed.connect(_on_sort_pressed)
 	
 	_build_slots()
+
+	var viewport: Viewport = get_viewport()
+	if viewport != null and not viewport.size_changed.is_connected(_update_columns):
+		viewport.size_changed.connect(_update_columns)
+	if not resized.is_connected(_update_columns):
+		resized.connect(_update_columns)
+	_update_columns()
+
 	_refresh_slots()
+
+
+## Chooses the column count so the whole grid fits the current viewport. Uses the
+## widest layout that still fits the available width, which also minimises the
+## number of rows (and therefore the height).
+func _update_columns() -> void:
+	if _grid == null:
+		return
+	var viewport_width: float = get_viewport_rect().size.x
+	var slot_size: float = InventorySlotUI.SLOT_SIZE
+	# Reserve room for the 16 px screen margins on both sides plus panel padding.
+	var available_width: float = viewport_width - 64.0
+	var fitting_columns: int = int(floor((available_width + float(GRID_SEPARATION)) / (slot_size + float(GRID_SEPARATION))))
+	_grid.columns = clampi(fitting_columns, MIN_COLUMNS, MAX_COLUMNS)
 
 
 func _input(event: InputEvent) -> void:
@@ -27,8 +55,10 @@ func _input(event: InputEvent) -> void:
 			_on_sort_pressed()
 
 
+## Builds one widget per inventory capacity slot, read from `InventoryManager`
+## so the UI always matches the real storage size (expanded to 48).
 func _build_slots() -> void:
-	for i: int in SLOT_COUNT:
+	for _i: int in InventoryManager.MAX_CAPACITY:
 		var slot: InventorySlotUI = InventorySlotUI.new()
 		_grid.add_child(slot)
 		_slots.append(slot)

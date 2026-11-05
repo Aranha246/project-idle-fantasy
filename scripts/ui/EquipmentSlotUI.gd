@@ -6,11 +6,13 @@ extends ItemSlotUI
 ## drag & drop: the equipped item can be dragged back to the inventory and a
 ## compatible inventory item can be dropped here to equip it.
 
-const SLOT_MIN_SIZE: Vector2 = Vector2(232.0, 56.0)
-const SLOT_ICON_SIZE: float = 40.0
-const SLOT_CONTENT_MARGIN: float = 8.0
+## Compact slot footprint so all thirteen slots fit a 3-column grid inside the
+## shortest supported viewport (844x390) without any scrolling.
+const SLOT_MIN_SIZE: Vector2 = Vector2(150.0, 48.0)
+const SLOT_ICON_SIZE: float = 32.0
+const SLOT_CONTENT_MARGIN: float = 6.0
 ## Horizontal gap between the icon box and the label column.
-const SLOT_GAP: float = 12.0
+const SLOT_GAP: float = 8.0
 
 ## Canonical slot name (e.g. "WEAPON") understood by `EquipmentManager`.
 var slot_name: String = ""
@@ -65,8 +67,9 @@ func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	var dropped: ItemData = payload.get("item")
 	if dropped == null:
 		return false
-	# Only items whose allowed slot matches this slot may be dropped here.
-	return dropped.equipment_slot == ItemData.slot_from_name(slot_name)
+	# Acceptance is decided by `EquipmentManager` so the two ring slots, which
+	# share the single RING category, validate correctly.
+	return EquipmentManager.can_equip_in(dropped, slot_name)
 
 
 func _drop_data(_at_position: Vector2, data: Variant) -> void:
@@ -155,11 +158,12 @@ func _build_children() -> void:
 	var slot_label_node: Label = Label.new()
 	slot_label_node.text = slot_label
 	slot_label_node.modulate = Color(0.7, 0.7, 0.7, 1.0) # Dimmed slot label
-	slot_label_node.add_theme_font_size_override("font_size", 14)
+	slot_label_node.add_theme_font_size_override("font_size", 11)
 	slot_label_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text_box.add_child(slot_label_node)
 
 	_name_label = Label.new()
 	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_name_label.add_theme_font_size_override("font_size", 16)
+	_name_label.add_theme_font_size_override("font_size", 13)
+	_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	text_box.add_child(_name_label)

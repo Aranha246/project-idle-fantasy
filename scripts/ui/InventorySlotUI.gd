@@ -6,7 +6,9 @@ extends ItemSlotUI
 ## drop: items can be dragged out of the slot, and an item dragged here from an
 ## equipment slot is unequipped back into the inventory.
 
-const SLOT_SIZE: float = 48.0
+## Compact slot footprint so a 48-slot grid still fits inside short landscape
+## viewports (844x390) without introducing any scrolling.
+const SLOT_SIZE: float = 40.0
 
 var _icon: TextureRect
 var _stack_label: Label

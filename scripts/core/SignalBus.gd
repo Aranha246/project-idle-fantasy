@@ -41,14 +41,32 @@ signal stats_updated(stats: Dictionary)
 ## Emitted when the active zone changes.
 signal zone_changed(new_zone: Resource)
 
-## Emitted when a new enemy is spawned.
-signal enemy_spawned(enemy_data: Resource, current_health: int, max_health: int)
+## Emitted when the player explicitly starts a quest. Carries the quest and the
+## total duration (seconds) it will take once upgrade bonuses are applied.
+signal quest_started(quest: Resource, duration: float)
 
-## Emitted when an enemy's health changes.
-signal enemy_health_updated(current_health: int, max_health: int)
+## Emitted every frame while a quest is running. `ratio` is 0..1 completion,
+## `remaining` is the time left in seconds.
+signal quest_progress(quest: Resource, ratio: float, remaining: float)
 
-## Emitted when a quest (combat tick) is completed with rewards.
+## Emitted once a running quest finishes and is waiting to be claimed. Nothing is
+## granted until the player claims, so the loop never plays itself.
+signal quest_ready(quest: Resource)
+
+## Emitted when the player claims a finished quest, carrying the granted rewards.
+signal quest_claimed(rewards: Dictionary)
+
+## Emitted when the list of quests available for the active zone changes.
+signal quests_refreshed()
+
+## Emitted when a quest is completed with rewards (consumed by progression).
 signal quest_completed(rewards: Dictionary)
+
+## Emitted after the player buys an upgrade level.
+signal upgrade_purchased(upgrade_id: StringName, new_level: int)
+
+## Emitted whenever any upgrade level changes (purchase or load).
+signal upgrades_updated()
 
 ## Emitted whenever a player setting changes and has been applied.
 ## `settings` is a snapshot dictionary (see `SettingsManager.get_snapshot()`).

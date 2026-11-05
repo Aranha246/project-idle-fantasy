@@ -13,11 +13,13 @@ extends Resource
 ## Nested resource class to track item drop data.
 class LootEntry extends Resource:
 	@export var item_id: StringName = &""
-	@export var drop_chance: float = 0.1 # 10%
+	@export_range(0.0, 1.0) var drop_chance: float = 0.1 # 10%
 	@export var min_quantity: int = 1
 	@export var max_quantity: int = 1
-	
-	func roll_drop() -> int:
-		if randf() < drop_chance:
-			return randi_range(min_quantity, max_quantity)
-		return 0
+
+	## Returns how many of the item a *successful* drop yields. The success roll
+	## itself is owned by `LootRoller` so the chance can be scaled by the player's
+	## luck and the zone's drop modifier without rolling twice.
+	func roll_quantity() -> int:
+		var low: int = maxi(1, min_quantity)
+		return randi_range(low, maxi(low, max_quantity))
