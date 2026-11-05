@@ -64,21 +64,41 @@ func _test_game_database() -> void:
 
 
 func _test_visual_assets() -> void:
-	# Every rarity must produce a usable, visible, cached icon texture so runtime
-	# generated loot never falls back to an engine placeholder graphic.
-	var common_icon: Texture2D = GameTheme.build_item_icon(ItemData.Rarity.COMMON)
-	_assert(common_icon != null, "the generated item icon is a valid texture")
-	_assert(common_icon.get_width() > 0 and common_icon.get_height() > 0, "the generated item icon has real dimensions")
-	_assert(GameTheme.build_item_icon(ItemData.Rarity.COMMON) == common_icon, "generated icons are cached per rarity")
+	# Every authored item icon must load as a usable, visible, cached texture so
+	# runtime generated loot never falls back to an engine placeholder graphic.
+	var weapon_item: ItemData = ItemData.new()
+	weapon_item.equipment_slot = ItemData.EquipmentSlot.WEAPON
+	var weapon_icon: Texture2D = GameTheme.build_item_icon(weapon_item)
+	_assert(weapon_icon != null, "the weapon category icon loads as a valid texture")
+	if weapon_icon == null:
+		return
+	_assert(weapon_icon.get_width() > 0 and weapon_icon.get_height() > 0, "the item icon has real dimensions")
+	_assert(GameTheme.build_item_icon(weapon_item) == weapon_icon, "item icons are cached per file stem")
 
-	var center: Vector2i = Vector2i(common_icon.get_width() / 2, common_icon.get_height() / 2)
-	var center_pixel: Color = common_icon.get_image().get_pixelv(center)
-	_assert(center_pixel.a > 0.5, "the generated item icon is opaque at its centre")
-	_assert(common_icon.get_image().get_pixel(0, 0).a < 0.5, "the generated item icon is transparent at its corners")
+	var center: Vector2i = Vector2i(weapon_icon.get_width() / 2, weapon_icon.get_height() / 2)
+	_assert(weapon_icon.get_image().get_pixelv(center).a > 0.5, "the item icon is opaque at its centre")
+	_assert(weapon_icon.get_image().get_pixel(0, 0).a < 0.5, "the item icon is transparent at its corners")
 
-	var legendary_icon: Texture2D = GameTheme.build_item_icon(ItemData.Rarity.LEGENDARY)
-	var legendary_pixel: Color = legendary_icon.get_image().get_pixelv(center)
-	_assert(legendary_pixel != center_pixel, "each rarity produces a distinctly tinted icon")
+	# Category resolution: equipment maps by slot, everything else by item type.
+	var ring_item: ItemData = ItemData.new()
+	ring_item.equipment_slot = ItemData.EquipmentSlot.RING
+	_assert(GameTheme.icon_file_stem(ring_item) == "ring", "equipment resolves its icon by category")
+	var potion_item: ItemData = ItemData.new()
+	potion_item.item_type = ItemData.ItemType.CONSUMABLE
+	_assert(GameTheme.icon_file_stem(potion_item) == GameTheme.CONSUMABLE_ICON_FILE, "consumables resolve to the consumable sprite")
+	var ore_item: ItemData = ItemData.new()
+	ore_item.item_type = ItemData.ItemType.MATERIAL
+	_assert(GameTheme.icon_file_stem(ore_item) == GameTheme.MATERIAL_ICON_FILE, "materials resolve to the material sprite")
+
+	# Every shipped stem must have a file on disk so no slot can render empty.
+	var missing_stems: Array[String] = []
+	for stem: String in GameTheme.SLOT_ICON_FILES:
+		if not ResourceLoader.exists(GameTheme.ITEM_ICON_DIR + stem + ".png"):
+			missing_stems.append(stem)
+	for extra_stem: String in [GameTheme.CONSUMABLE_ICON_FILE, GameTheme.MATERIAL_ICON_FILE]:
+		if not ResourceLoader.exists(GameTheme.ITEM_ICON_DIR + extra_stem + ".png"):
+			missing_stems.append(extra_stem)
+	_assert(missing_stems.is_empty(), "every item icon sprite ships with the project (missing: %s)" % ", ".join(missing_stems))
 
 	var tints_distinct: bool = true
 	for rarity_index: int in range(ItemData.Rarity.size() - 1):

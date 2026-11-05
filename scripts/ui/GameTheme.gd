@@ -26,8 +26,9 @@ const BORDER_HC: Color = Color(1.0, 1.0, 1.0, 1.0)
 const ACCENT_HC: Color = Color(1.0, 0.843137, 0.2, 1.0)
 const TEXT_HC: Color = Color(1.0, 1.0, 1.0, 1.0)
 
-## Rarity tints used for generated item icons. The order mirrors
-## `ItemData.Rarity` (COMMON, UNCOMMON, RARE, EPIC, LEGENDARY).
+## Rarity tints, used wherever the UI colour-codes a rarity (slot borders,
+## tooltips). The order mirrors `ItemData.Rarity`
+## (COMMON, UNCOMMON, RARE, EPIC, LEGENDARY).
 const RARITY_COLORS: Array[Color] = [
 	Color(0.741176, 0.760784, 0.803922, 1.0),
 	Color(0.435294, 0.803922, 0.462745, 1.0),
@@ -36,13 +37,32 @@ const RARITY_COLORS: Array[Color] = [
 	Color(1.0, 0.647059, 0.176471, 1.0),
 ]
 
-## Edge length of the procedurally generated item icon.
-const ITEM_ICON_SIZE: int = 64
+## Directory holding the authored item icon sprites.
+const ITEM_ICON_DIR: String = "res://assets/sprites/items/"
+
+## Icon file stem per equipment category, indexed by `ItemData.EquipmentSlot`.
+## Non-equippable items resolve to the consumable or material sprite instead.
+const SLOT_ICON_FILES: Array[String] = [
+	"helmet",
+	"trinket",
+	"amulet",
+	"weapon",
+	"off_hand",
+	"body_armor",
+	"ring",
+	"necklace",
+	"belt",
+	"gloves",
+	"boots",
+	"artifact",
+]
+const CONSUMABLE_ICON_FILE: String = "consumable"
+const MATERIAL_ICON_FILE: String = "material"
 
 const BASE_FONT_SIZE: int = 16
 const HIGH_CONTRAST_FONT_SIZE: int = 18
 
-## Cache keyed by tint so each rarity is only rasterised once per session.
+## Cache keyed by icon file stem so each sprite is only loaded once per session.
 static var _item_icon_cache: Dictionary = {}
 
 const CORNER_RADIUS: int = 6
@@ -155,40 +175,31 @@ static func rarity_color(rarity_index: int) -> Color:
 	return RARITY_COLORS[clampi(rarity_index, 0, RARITY_COLORS.size() - 1)]
 
 
-## Builds (and caches) a cohesive faceted gem icon tinted for the given rarity.
-## Used as the fallback art for items that ship no `item_icon`, so runtime
-## generated loot reads as authored art instead of the engine placeholder.
-static func build_item_icon(rarity_index: int) -> Texture2D:
-	var tint: Color = rarity_color(rarity_index)
-	var key: String = tint.to_html()
-	if _item_icon_cache.has(key):
-		return _item_icon_cache[key]
-	var texture: ImageTexture = ImageTexture.create_from_image(_draw_gem(tint))
-	_item_icon_cache[key] = texture
+## Resolves the authored icon file stem an item uses: equippable items map
+## through `SLOT_ICON_FILES` by category, everything else falls back to the
+## consumable or material sprite.
+static func icon_file_stem(item: ItemData) -> String:
+	if item != null and ItemData.is_valid_equipment_slot(item.equipment_slot):
+		return SLOT_ICON_FILES[int(item.equipment_slot)]
+	if item != null and item.item_type == ItemData.ItemType.CONSUMABLE:
+		return CONSUMABLE_ICON_FILE
+	return MATERIAL_ICON_FILE
+
+
+## Loads (and caches) the authored icon sprite for an item, keyed by its icon
+## file stem so each PNG is read from disk at most once per session. Used as the
+## fallback art for items that ship no `item_icon`, so runtime generated loot
+## reads as authored art instead of the engine placeholder. Returns `null` when
+## the sprite is missing so callers degrade gracefully instead of crashing.
+static func build_item_icon(item: ItemData) -> Texture2D:
+	var stem: String = icon_file_stem(item)
+	if _item_icon_cache.has(stem):
+		return _item_icon_cache[stem] as Texture2D
+	var path: String = ITEM_ICON_DIR + stem + ".png"
+	var texture: Texture2D = null
+	if ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	else:
+		push_warning("GameTheme: missing item icon sprite '%s'" % path)
+	_item_icon_cache[stem] = texture
 	return texture
-
-
-static func _draw_gem(tint: Color) -> Image:
-	var size: int = ITEM_ICON_SIZE
-	var image: Image = Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
-	image.fill(Color(0.0, 0.0, 0.0, 0.0))
-	var center: float = float(size) * 0.5
-	var half: float = center - 2.0
-	for y: int in size:
-		var vertical: float = 1.0 - float(y) / float(size)
-		for x: int in size:
-			var dx: float = absf(float(x) + 0.5 - center)
-			var dy: float = absf(float(y) + 0.5 - center)
-			var dist: float = dx + dy
-			# Diamond (rune) silhouette: everything outside the rhombus stays clear.
-			if dist > half:
-				continue
-			var edge: float = dist / half
-			var brightness: float = clampf(0.5 + vertical * 0.35 + (1.0 - edge) * 0.3, 0.0, 1.3)
-			var color: Color = tint * brightness
-			# Soft specular highlight toward the top facet.
-			var highlight: float = clampf(1.0 - dist / (half * 0.6), 0.0, 1.0)
-			color = color.lerp(Color.WHITE, highlight * 0.35 * vertical)
-			color.a = clampf((half - dist) / 2.0, 0.0, 1.0)
-			image.set_pixel(x, y, color)
-	return image

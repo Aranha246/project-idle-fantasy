@@ -12,14 +12,14 @@ const SLOT_ICON_MARGIN: float = 4.0
 var item: ItemData = null
 
 
-## Returns the item's own icon, or a generated rarity-tinted gem when none is
+## Returns the item's own icon, or the authored category sprite when none is
 ## assigned (for example items generated at runtime such as the default
-## 'Rusty Dagger' loot). The generated icon is a plain `Texture2D`, so it is
+## 'Rusty Dagger' loot). The resolved icon is a plain `Texture2D`, so it is
 ## safe to assign directly to any slot's `TextureRect.texture`.
 func resolve_item_icon(source_item: ItemData) -> Texture2D:
 	if source_item.item_icon != null:
 		return source_item.item_icon
-	return GameTheme.build_item_icon(source_item.rarity)
+	return GameTheme.build_item_icon(source_item)
 
 
 ## Builds the multi-line metadata tooltip shown when hovering an occupied slot.

@@ -511,6 +511,17 @@ func _test_main_ui_wiring() -> void:
 
 	var hero: HeroArt = _find_first(main, "HeroArt") as HeroArt
 	_assert(hero != null, "the animated hero artwork is mounted in the quest board")
+	_assert(hero != null and hero.get_frame_count() > 0, "the hero sprite frames load from the shipped art")
+
+	# Every authored hero frame must ship, because the hero art no longer has a
+	# procedural fallback to draw when a frame is missing.
+	var missing_hero_frames: Array[String] = []
+	for pose_index: int in HeroArt.POSE_FILES.size():
+		for frame_index: int in HeroArt.POSE_FRAME_COUNTS[pose_index]:
+			var frame_path: String = "%s%s_%d.png" % [HeroArt.SPRITE_DIR, HeroArt.POSE_FILES[pose_index], frame_index]
+			if not ResourceLoader.exists(frame_path):
+				missing_hero_frames.append(frame_path)
+	_assert(missing_hero_frames.is_empty(), "every hero sprite frame ships with the project (missing: %s)" % ", ".join(missing_hero_frames))
 
 	# Player agency: only a click on the quest board starts a quest.
 	ProgressionManager.load_state({"level": 1, "xp": 0})
